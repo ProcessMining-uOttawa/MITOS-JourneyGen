@@ -1066,7 +1066,7 @@ def view_score() -> None:
              "the journey as well. This is what finds shared instances.")
     for label, journeys in found.items():
         if label not in scores:
-            scores[label] = sc.score(truth, journeys, shared)
+            scores[label] = sc.score(truth, journeys[["case_id", "journey_id"]], shared)
         plus = f"{label} + register"
         if add and plus not in scores and not label.startswith("register only"):
             reg_log, reg = register_tools(rg, log)
@@ -1151,12 +1151,16 @@ def view_bundles() -> None:
                    "This is the best possible answer, not what a method would give.")
     else:
         members = found[source]
-        if "kinds" in ss and source.startswith("latent"):
-            st.caption("The latent model's journeys. Run it in Score a method to see the "
-                       "kinds it found.")
-        st.caption(f"Using the journeys of *{source}*. They carry no life-event label, so "
-                   "everything is one kind; compare with the true episodes to see what the "
-                   "method changes.")
+        if "kind" in members.columns:
+            st.caption(f"Using the journeys of *{source}*. The kinds are the ones this model "
+                       "discovered by itself; nobody told it what the life events are. Each "
+                       "is named after the services most typical of it. Compare with "
+                       "the true episodes to see how well they match.")
+        else:
+            st.caption(f"Using the journeys of *{source}*. This method groups instances but "
+                       "does not say what kind of life event a journey is, so everything is "
+                       "one kind. The latent life-event model does; compare also with the "
+                       "true episodes.")
     log = journey_log_cached(source, int(min_size), len(members))
     if log.empty:
         st.info("No journey has that many instances.")
@@ -1241,6 +1245,23 @@ def view_bundles() -> None:
                "was told plus what the method recovered, not what Greek citizens do.")
 
 
+def kind_names(kinds: pd.DataFrame | None) -> dict:
+    """A readable name for each kind the latent model found: its number and the
+    one or two services most typical of it. A service every kind brings, such
+    as an authorisation, says little; one that mostly this kind brings says
+    what the kind is."""
+    if kinds is None or kinds.empty:
+        return {}
+    out = {}
+    everywhere = kinds.groupby("service").per_event.transform("sum")
+    kinds = kinds.assign(typical=kinds.per_event * kinds.per_event / everywhere)
+    for kind, rows in kinds.groupby("kind"):
+        top = rows.sort_values("typical", ascending=False).service.head(2)
+        out[int(kind)] = f"Kind {int(kind)}: " + " + ".join(
+            s if len(s) <= 42 else s[:40].rstrip() + "…" for s in top)
+    return out
+
+
 def journey_log_cached(source: str, min_size: int, n_members: int) -> pd.DataFrame:
     """The journey-level log for one source of journeys, built once per log."""
     import bundles as bd
@@ -1255,6 +1276,10 @@ def journey_log_cached(source: str, min_size: int, n_members: int) -> pd.DataFra
             members = members.assign(kind=members.kind.map(names).fillna(members.kind))
         else:
             members = ss.found[source]
+            if "kind" in members.columns:   # the latent model names its own kinds
+                names = kind_names(ss.get("kinds"))
+                members = members.assign(kind=[names.get(k, "No life event found")
+                                               for k in members.kind])
         cache[key] = bd.journey_log(inst, members, bd.organisations(inst.service_id), min_size)
     return cache[key]
 

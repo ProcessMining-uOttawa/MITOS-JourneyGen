@@ -21,8 +21,9 @@ from everything *else* it brought.
     python latent.py ../out --kinds 12
 
 Writes ``latent_kinds.csv`` (the bundles), ``journeys_latent.csv``
-(overlapping) and ``journeys_latent_partition.csv`` (with the kind of each
-journey) next to the log. Needs numpy and pandas.
+(overlapping) and ``journeys_latent_partition.csv`` next to the log. Both
+journey files carry the kind of each journey: a number that ``latent_kinds.csv``
+describes, 0 for "no life event" and -1 for a single instance. Needs numpy and pandas.
 """
 from __future__ import annotations
 
@@ -173,10 +174,13 @@ def fit(inst: pd.DataFrame, kinds: int = 12, min_pairs: int = 15, min_brought: f
                 if b not in seen:
                     seen.add(b)
                     stack.append(b)
-        rows += [(x, start) for x in seen]
+        # the kind of a journey is the kind of the instance it starts from;
+        # a single instance is no life event
+        rows += [(x, start, kind_of[start] if len(seen) > 1 else -1) for x in seen]
     cases = inst.case_id.to_numpy()
-    journeys = pd.DataFrame({"case_id": cases[[x for x, _ in rows]],
-                             "journey_id": [g for _, g in rows]})
+    journeys = pd.DataFrame({"case_id": cases[[x for x, _, _ in rows]],
+                             "journey_id": [g for _, g, _ in rows],
+                             "kind": [int(k) for _, _, k in rows]})
 
     names = inst.drop_duplicates("service_id").set_index("service_id").service
     found = partition[partition.kind >= 0].drop_duplicates("journey_id").kind.value_counts()
