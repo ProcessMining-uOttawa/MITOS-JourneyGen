@@ -140,6 +140,29 @@ def test_generate_inspect_and_score(fmt, log_file):
     source.set_value("Hawkes, overlapping").run()
     assert not at.exception, at.exception
     assert any(m.label == "Journeys" for m in at.metric)
+    kinds = next(m for m in at.metric if m.label == "Kinds")
+    assert kinds.value == "1"                      # Hawkes does not name life events
+
+
+def test_the_latent_models_kinds_reach_the_bundles_view():
+    at = go(start(), "Generate")
+    button(at, "Generate").click().run()
+    go(at, "Score a method")
+    button(at, "Latent life events").click().run()
+    assert not at.exception, at.exception
+    found = at.session_state["found"]["latent life events, overlapping"]
+    assert "kind" in found.columns and (found.kind > 0).any()
+
+    go(at, "Bundles to integrate")
+    next(s for s in at.selectbox if s.label == "Journeys to use").set_value(
+        "latent life events, overlapping").run()
+    assert not at.exception, at.exception
+    assert int(next(m for m in at.metric if m.label == "Kinds").value) >= 5
+    logs = at.session_state["result"]["journey_logs"]
+    log = next(v for k, v in logs.items() if k[0].startswith("latent"))
+    names = set(log["case:kind"])
+    assert all(n.startswith("Kind ") or n == "No life event found" for n in names)
+    assert any("passport" in n.lower() for n in names)
 
 
 def test_the_same_seed_gives_the_same_log_as_the_command_line(tmp_path):
