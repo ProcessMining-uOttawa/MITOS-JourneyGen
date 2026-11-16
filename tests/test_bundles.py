@@ -111,6 +111,7 @@ def opportunity_log():
         chain(12, [("Licence", 0)], "licence2"),
         chain(8, [("Address", 0), ("Residence", 4)], "move"),              # either order
         chain(8, [("Residence", 0), ("Address", 4)], "moveb"),
+        chain(20, [("Meter", 0), ("Contract", 2)], "movec"),             # most moves differ
         chain(10, [("Death act", 0), ("Death act", 6), ("Funeral", 9)], "death"),
     ):
         rows += part[0]
@@ -118,7 +119,7 @@ def opportunity_log():
     m = pd.DataFrame(members)
     m.loc[m.kind == "other", "kind"] = "pension"       # the certificate serves two purposes
     m.loc[m.kind == "licence2", "kind"] = "licence"
-    m.loc[m.kind == "moveb", "kind"] = "move"
+    m.loc[m.kind.isin(["moveb", "movec"]), "kind"] = "move"
     # journeys of one service are bundles of nothing; give the lone licences a companion
     extra = chain(12, [("Licence", 0), ("Stamp", 1)], "licence3")
     rows = [r for r in rows if not r["case_id"].startswith("licence2")] + extra[0]
@@ -226,3 +227,65 @@ def test_the_ranking_travels_with_the_journey_log():
     assert kinds["top_opportunity"] == "string"
     event = {a.get("key") for a in trace.find("x:event", ns)}
     assert {"avoidable_request", "repeated_request", "org:role"} <= event
+
+
+def test_a_pair_the_entry_point_covers_is_not_said_twice():
+    rows, members = [], []
+    for part in (chain(10, [("Form", 0), ("Photo", 3)], "id"),
+                 chain(10, [("Photo", 0), ("Form", 3)], "idb"),
+                 chain(30, [("Tax", 0), ("Stamp", 1)], "tax")):
+        rows += part[0]
+        members += part[1]
+    m = pd.DataFrame(members)
+    m.loc[m.kind == "idb", "kind"] = "id"
+    opp = bd.opportunities(bd.journey_log(pd.DataFrame(rows), m), min_journeys=4)
+    of_id = opp[opp.kind == "id"]
+    assert list(of_id.recommendation) == [bd.TYPES["life event"]]
+    assert "'Form'" in of_id.iloc[0].what and "'Photo'" in of_id.iloc[0].what
+
+
+def test_rare_and_weakly_tied_pairs_are_left_out():
+    log = opportunity_log()
+    loose = bd.opportunities(log, min_journeys=4, min_lift=1.0, kind_share=0.0)
+    tight = bd.opportunities(log, min_journeys=4)
+    assert len(tight) <= len(loose)
+    # a pair in fewer than a tenth of the journeys of its kind does not count
+    assert bd.opportunities(log, min_journeys=4, kind_share=0.9)[
+        lambda o: o.recommendation == bd.TYPES["fetch"]].empty
+
+
+def test_failed_requests_are_counted_for_each_recommendation():
+    rows, members = chain(20, [("Birth act", 0), ("Allowance", 5)], "birth")
+    inst = pd.DataFrame(rows).assign(outcome="completed")
+    # five allowances fail and are requested again
+    again = []
+    for j in range(5):
+        inst.loc[inst.case_id == f"birth-{j}-1", "outcome"] = "unsuccessful"
+        t = pd.Timestamp("2024-03-01") + pd.Timedelta(days=j)
+        again.append({"case_id": f"retry-{j}", "citizen_id": f"birth{j}",
+                      "service_id": "Allowance", "service": "Allowance", "start": t,
+                      "end": t + pd.Timedelta(hours=1), "channel": "digital",
+                      "outcome": "completed"})
+        members.append({"case_id": f"retry-{j}", "journey_id": f"birth{j}", "kind": "birth"})
+    inst = pd.concat([inst, pd.DataFrame(again)], ignore_index=True)
+    filler = chain(20, [("Tax", 0), ("Stamp", 1)], "tax")
+    inst = pd.concat([inst, pd.DataFrame(filler[0]).assign(outcome="completed")],
+                     ignore_index=True)
+    log = bd.journey_log(inst, pd.DataFrame(members + filler[1]))
+    assert set(log.outcome) == {"completed", "unsuccessful"}
+
+    opp = bd.opportunities(log, min_journeys=4)
+    step = opp[(opp.recommendation == bd.TYPES["one step"]) & (opp.kind == "birth")].iloc[0]
+    assert step.failed_requests == 5                  # of 45 requests for the two
+    assert step.failure_rate == round(5 / 45, 3)
+    assert "5 failed or were abandoned (11%)" in step.evidence
+    clean = opp[(opp.recommendation == bd.TYPES["one step"]) & (opp.kind == "tax")].iloc[0]
+    assert clean.failed_requests == 0 and step.score > clean.score   # failures weigh in
+    assert "failed or were abandoned: 5" in bd.report(opp, log, "a test")
+
+    out = bd.annotate(log, bd.top(opp))
+    per_case = out.drop_duplicates("case:concept:name").set_index("case:concept:name")
+    assert per_case["case:failed_requests"].sum() == 5
+    # without outcomes nothing is claimed
+    silent = bd.opportunities(opportunity_log(), min_journeys=4)
+    assert (silent.failed_requests == 0).all() and "failed" not in silent.evidence.iloc[0]
