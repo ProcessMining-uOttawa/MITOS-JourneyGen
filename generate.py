@@ -339,7 +339,7 @@ class Generator:
 
         def dump(fname, head, lines):
             with open(os.path.join(out, fname), "w", newline="", encoding="utf-8") as f:
-                w = csv.writer(f)
+                w = csv.writer(f, lineterminator="\n")  # same bytes on every platform
                 w.writerow(head)
                 w.writerows(lines)
 
@@ -400,7 +400,7 @@ class Generator:
                 1 for i in self.instances if i["shared"] and not i["episode"]),
             "labels_left_in_greek": len(cat.untranslated),
         }
-        with open(os.path.join(out, "manifest.json"), "w", encoding="utf-8") as f:
+        with open(os.path.join(out, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=1)
         return manifest
 
