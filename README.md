@@ -74,7 +74,10 @@ them, and the words the tool uses.
   journey-level log to open in PM4Py-UCM.
 - **Score a method.** Upload a `journeys.csv` (`case_id`, `journey_id`) to score
   it against the ground truth and the fixed-gap baselines, or run a bundled
-  method: the three that read only the log, and the register alone. A switch
+  method: the three that read only the log, and the register alone. Three
+  cards give the baseline to beat, the best method so far and how far ahead it
+  is; the table colours every score from red to green, stars the best of each
+  column and can be sorted. A switch
   shows every method, an uploaded one included, with the register's links
   added. The view says how many shared instances the log has and warns when
   they are too few to judge *shared found*.
@@ -89,6 +92,16 @@ instance, no reuse of certificates, no background use, a population too small
 to learn a bundle from. On the command line, `--describe` prints the same
 remarks, and a run says how many warnings there are. The bundled scenarios
 draw none.
+
+**Light and dark.** The app has both themes. Open the menu at the top right,
+choose *Settings*, then the theme; *Use system setting* follows the computer.
+Colours were checked in both: each kind of recommendation, level of effort and
+life event keeps one colour throughout, and a score is coloured from red to
+green by how good it is, always beside its number or its name.
+
+**Logo.** `assets/` holds the mark shown in the side menu and the browser tab:
+a path that climbs from one service to the next and ends in a ring, where the
+services come together. `python assets/make_logo.py` rewrites the files.
 
 *Save project* writes the scenarios, population and generation settings to one
 file; *Load project* restores them. The app allows up to 20,000 citizens; set

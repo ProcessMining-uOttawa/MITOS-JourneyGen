@@ -3,6 +3,11 @@
 [server]
 port = 8612
 
-# The accent of buttons and selections: the blue of the Greek flag.
-[theme]
+# Two themes, so that the viewer can choose: the menu at the top right, then
+# Settings. The accent is the blue of the Greek flag, lighter on dark so that
+# it still reads.
+[theme.light]
 primaryColor = "#0D5EAF"
+
+[theme.dark]
+primaryColor = "#5AA9F0"

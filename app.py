@@ -50,7 +50,20 @@ EFFORT_COLOURS = {"1": "#16a34a", "2": "#ca8a04", "3": "#ea580c", "4": "#dc2626"
 LIFE_PALETTE = ["#4c78a8", "#f58518", "#54a24b", "#e45756", "#72b7b2", "#b279a2",
                 "#9d755d", "#eeca3b", "#ff9da6", "#bab0ac"]
 
-st.set_page_config(page_title="MITOS-JourneyGen", layout="wide")
+st.set_page_config(page_title="MITOS-JourneyGen", layout="wide",
+                   page_icon=os.path.join(HERE, "assets", "icon.png"))
+
+
+def dark() -> bool:
+    """Whether the viewer has the dark theme on (Settings in the app menu)."""
+    try:
+        return st.context.theme.type == "dark"
+    except Exception:  # noqa: BLE001 - no theme outside a browser session
+        return False
+
+
+st.logo(os.path.join(HERE, "assets", "logo_dark.svg" if dark() else "logo_light.svg"),
+        icon_image=os.path.join(HERE, "assets", "icon.svg"), size="large")
 
 
 if st.query_params.get("guide") == "methods":
@@ -133,6 +146,11 @@ def forget(*keys: str) -> None:
 SETTING_KEYS = ("w_citizens", "w_seed", "w_rate_scale", "w_format", "w_lang")
 
 
+def accent() -> str:
+    """The accent colour, lighter on a dark background so that it still reads."""
+    return "#5AA9F0" if dark() else "#0D5EAF"
+
+
 def life_colours() -> dict:
     """The colour of each life event, the same in every chart and table."""
     out = {}
@@ -191,7 +209,6 @@ def steps_table(pid: str) -> None:
 
 # ------------------------------------------------------------------- sidebar
 with st.sidebar:
-    st.title("MITOS-JourneyGen")
     st.caption("Synthetic logs of citizens using Greek public services, with ground truth.")
     view = st.radio("View", VIEWS, key="view", label_visibility="collapsed",
                     format_func=lambda v: f"{ICONS[v]} "
@@ -227,6 +244,8 @@ with st.sidebar:
     st.caption(f"Catalogue of {catalogue().meta['retrieved']}, "
                f"{len(catalogue().procedures):,} procedures. "
                "Procedure data: MITOS, CC BY-SA 4.0.")
+    st.caption(":material/contrast: Light or dark: open the menu at the top right, choose "
+               "*Settings*, then the theme. *Use system setting* follows your computer.")
 
 problems = gen.check(catalogue(), cfg)
 if problems and view != "Catalogue":
@@ -955,7 +974,8 @@ def view_inspect() -> None:
                 x=alt.X("p10:Q", title="Days from first start to last end (10% to 90%, "
                                        "dot = median)"), x2="p90:Q",
                 color=alt.Color("scenario:N", scale=life_scale, legend=None))
-            + base.mark_point(filled=True, size=70, color="black").encode(
+            + base.mark_point(filled=True, size=70,
+                              color="white" if dark() else "black").encode(
                 x="median:Q", tooltip=["scenario", "p10", "median", "p90"]),
             width="stretch")
         st.caption("No single time window fits every scenario. Each life event keeps "
@@ -986,14 +1006,15 @@ def view_inspect() -> None:
         color=alt.Color("belongs to:N", legend=alt.Legend(orient="bottom", columns=2,
                                                           labelLimit=400)),
         stroke=alt.Stroke("shared:N", scale=alt.Scale(domain=["shared", "not shared"],
-                                                      range=["black", "transparent"]),
+                                                      range=["white" if dark() else "black",
+                                                             "transparent"]),
                           legend=None),
         strokeWidth=alt.value(2),
         tooltip=["case_id", "service", "start", "end", "role", "outcome", "belongs to",
                  "also in"]).properties(height=alt.Step(22))
     st.altair_chart(chart, width="stretch")
     st.caption("Each bar is one service instance, coloured by the true episode it belongs to. "
-               "A black outline marks an instance that another episode reused. A method sees "
+               "An outline marks an instance that another episode reused. A method sees "
                "none of the colours: finding them is the task.")
 
 
@@ -1120,16 +1141,40 @@ def view_score() -> None:
     count = table_.pop("in 2+ journeys").astype(int)
     table_ = (table_ * 100).round(1)
     table_["in 2+ journeys"] = count
-    table_ = table_.sort_values("F1", ascending=False)
-    st.dataframe(table_, width="stretch", column_config={
-        "precision": st.column_config.NumberColumn(format="%.1f%%"),
-        "recall": st.column_config.NumberColumn(format="%.1f%%"),
-        "F1": st.column_config.NumberColumn(format="%.1f%%"),
-        "whole": st.column_config.NumberColumn("episodes whole", format="%.1f%%"),
-        "clean": st.column_config.NumberColumn("journeys clean", format="%.1f%%"),
-        "shared found": st.column_config.NumberColumn(format="%.1f%%"),
-        "in 2+ journeys": st.column_config.NumberColumn(
-            help="Instances the method placed in more than one journey.")})
+    baseline = table_[table_.index.str.startswith("fixed gap")].F1.max()
+    others = table_[~table_.index.str.startswith("fixed gap")]
+    cards = st.columns(3)
+    cards[0].metric("Baseline to beat", f"{baseline:.1f}%", border=True,
+                    help="The best F1 a fixed gap reaches on this log: "
+                         + table_[table_.index.str.startswith("fixed gap")].F1.idxmax() + ".")
+    if others.empty:
+        cards[1].metric("Best method so far", "none yet", border=True,
+                        help="Run a method above, or upload your own.")
+    else:
+        best = others.F1.idxmax()
+        cards[1].metric("Best method so far", f"{others.F1.max():.1f}%",
+                        f"{others.F1.max() - baseline:+.1f} points on the baseline",
+                        border=True, help=best)
+        mine = others[others.index.str.startswith("uploaded")]
+        if not mine.empty:
+            cards[2].metric("Your method", f"{mine.F1.max():.1f}%",
+                            f"{mine.F1.max() - baseline:+.1f} points on the baseline",
+                            border=True, help=mine.F1.idxmax())
+        else:
+            found_most = others["shared found"].idxmax()
+            cards[2].metric("Most shared instances found",
+                            f"{others['shared found'].max():.1f}%", border=True,
+                            help=found_most)
+    orders = {"F1": "F1", "Precision": "precision", "Recall": "recall",
+              "Episodes whole": "whole", "Journeys clean": "clean",
+              "Shared found": "shared found"}
+    c1, _ = st.columns([1, 3])
+    table_ = table_.sort_values(orders[c1.selectbox("Sort by", list(orders))], ascending=False)
+    score_table(table_)
+    st.caption("Colours: the bar and the number run from red (below 40%) through amber to "
+               "green (85% and above). A star marks the best value of a column. Methods are "
+               "tagged grey for the fixed-gap baselines, blue for those that read only the "
+               "log, violet for those that use the register, pink for yours.")
 
     if len(shared) < 50:
         st.warning(
@@ -1151,6 +1196,69 @@ def view_score() -> None:
             st.caption("Each kind is a bundle the model discovered: the services it brings, "
                        "how many per life event, and when.")
             st.dataframe(ss.kinds, hide_index=True, width="stretch")
+
+
+def grade(value: float) -> str:
+    """A colour for a percentage: red when poor, green when good."""
+    for floor, colour in ((85, "#16a34a"), (70, "#65a30d"), (55, "#ca8a04"), (40, "#ea580c")):
+        if value >= floor:
+            return colour
+    return "#dc2626"
+
+
+def score_table(scores: pd.DataFrame) -> None:
+    """The scores as a table that shows at a glance what is good and what is not."""
+    import html
+
+    names = {"F1": "F1", "precision": "precision", "recall": "recall",
+             "whole": "episodes whole", "clean": "journeys clean",
+             "shared found": "shared found"}
+    best = {c: scores[c].max() for c in names}
+
+    def family(label: str) -> str:
+        if label.startswith("fixed gap"):
+            return "#64748b"
+        if label.startswith("uploaded"):
+            return "#db2777"
+        return "#7c3aed" if "register" in label else "#2563eb"
+
+    head = '<th style="width:26%">method</th>' + "".join(
+        f'<th title="{html.escape(h, quote=True)}">{html.escape(h)}</th>'
+        for h in names.values()) + '<th style="width:9%" title="in 2+ journeys">in 2+</th>'
+    body = []
+    for label, row in scores.iterrows():
+        cells = [f'<td title="{html.escape(label, quote=True)}"><span class="jg-pill" '
+                 f'style="--c:{family(label)}">{html.escape(label)}</span></td>']
+        for c in names:
+            v = row[c]
+            if pd.isna(v):
+                cells.append('<td title="no shared instance in this log">&ndash;</td>')
+                continue
+            star = ' <span title="best in this column">&#9733;</span>' if v == best[c] and len(
+                scores) > 1 else ""
+            cells.append(
+                f'<td title="{v:.1f}%"><span class="jg-score"><b style="color:{grade(v)};'
+                f'min-width:3.2em">{v:.1f}%</b><span class="jg-bar"><span style="width:{v:.0f}%;'
+                f'background:{grade(v)}"></span></span>{star}</span></td>')
+        cells.append(f'<td title="instances placed in more than one journey">'
+                     f'{int(row["in 2+ journeys"]):,}</td>')
+        body.append("<tr>" + "".join(cells) + "</tr>")
+    st.html(
+        '<style>.jg-table{width:100%;table-layout:fixed;border-collapse:collapse;'
+        'font-size:0.85rem}.jg-table th,.jg-table td{padding:5px 8px;text-align:left;'
+        'border-bottom:1px solid rgba(128,128,128,0.25);white-space:nowrap;overflow:hidden;'
+        'text-overflow:ellipsis}.jg-table th{font-weight:600;'
+        'border-bottom:1px solid rgba(128,128,128,0.6)}'
+        '.jg-table tr:hover td{background:rgba(128,128,128,0.10)}'
+        '.jg-pill{display:inline-block;max-width:100%;box-sizing:border-box;overflow:hidden;'
+        'text-overflow:ellipsis;vertical-align:bottom;padding:0 8px;border-radius:9px;'
+        'border-left:4px solid var(--c);'
+        'background:color-mix(in srgb,var(--c) 16%,transparent)}'
+        '.jg-score{display:flex;align-items:center;gap:6px}'
+        '.jg-bar{flex:1;height:6px;border-radius:3px;background:rgba(128,128,128,0.2)}'
+        '.jg-bar span{display:block;height:100%;border-radius:3px}</style>'
+        f'<table class="jg-table"><thead><tr>{head}</tr></thead>'
+        f'<tbody>{"".join(body)}</tbody></table>')
 
 
 def register_tools(rg, log: pd.DataFrame):
@@ -1487,12 +1595,12 @@ def hover_table(df: pd.DataFrame, columns: dict, widths: dict) -> None:
         'background:color-mix(in srgb,var(--c) 16%,transparent)}'
         '.jg-score{display:flex;align-items:center;gap:6px}.jg-score b{min-width:1.5em}'
         '.jg-bar{flex:1;height:6px;border-radius:3px;background:rgba(128,128,128,0.2)}'
-        '.jg-bar span{display:block;height:100%;border-radius:3px;background:#0D5EAF}'
+        '.jg-bar span{display:block;height:100%;border-radius:3px;background:var(--jg)}'
         '.jg-rank{display:inline-block;min-width:1.6em;text-align:center;font-weight:700;'
-        'border-radius:50%;background:rgba(13,94,175,0.15)}'
+        'border-radius:50%;background:color-mix(in srgb,var(--jg) 22%,transparent)}'
         '.jg-dot{display:inline-block;width:9px;height:9px;border-radius:50%;'
         'margin-right:6px}</style>'
-        f'<table class="jg-table"><thead><tr>{head}</tr></thead>'
+        f'<table class="jg-table" style="--jg:{accent()}"><thead><tr>{head}</tr></thead>'
         f'<tbody>{"".join(body)}</tbody></table>')
 
 
