@@ -23,6 +23,9 @@ in the folder. Writes ``journeys_register.csv`` (overlapping: each instance
 that nothing uses, with everything it uses directly or indirectly),
 ``journeys_register_partition.csv`` (connected groups of "uses" links) and
 one ``journeys_<method>+register.csv`` per method. Needs numpy and pandas.
+
+The generator builds its bundles from these same links, so on its logs the
+register looks better than it would on real ones.
 """
 from __future__ import annotations
 
@@ -52,7 +55,7 @@ def validity_days(iso: str | None) -> float | None:
 
 
 class Register:
-    def __init__(self, catalogue: str, default_validity: float):
+    def __init__(self, catalogue: str, default_validity: float = 90.0):
         with gzip.open(catalogue, "rt", encoding="utf-8") as f:
             procs = json.load(f)["procedures"]
         self.requires = {pid: [r["id"] for r in p["requires"]] for pid, p in procs.items()}
@@ -60,18 +63,28 @@ class Register:
                       for pid, p in procs.items()}
 
 
-class Held:
-    """What each citizen holds: per citizen and service, instances by end time."""
+class Log:
+    """The instances of a log, as plain arrays, and what each citizen holds:
+    per citizen and service, the instances in order of their end."""
 
     def __init__(self, inst: pd.DataFrame):
+        self.case = inst.case_id.astype(str).to_numpy()
+        self.citizen = inst.citizen_id.to_numpy()
+        self.service = inst.service_id.astype(str).to_numpy()
+        t0 = inst.start.min()
+        self.start = ((inst.start - t0).dt.total_seconds() / 86400).to_numpy()
+        self.end = ((inst.end - t0).dt.total_seconds() / 86400).to_numpy()
+        self.row = {c: i for i, c in enumerate(self.case)}
         self.by: dict = {}
-        order = np.argsort(inst.end.to_numpy(), kind="stable")
-        for i in order:
-            ends, idx = self.by.setdefault((inst.citizen_id[i], inst.service_id[i]), ([], []))
-            ends.append(inst.end_day[i])
-            idx.append(i)
+        for i in np.argsort(self.end, kind="stable"):
+            ends, idx = self.by.setdefault((self.citizen[i], self.service[i]), ([], []))
+            ends.append(self.end[i])
+            idx.append(int(i))
 
-    def latest(self, citizen, service, before: float, valid: float):
+    def __len__(self) -> int:
+        return len(self.case)
+
+    def latest(self, citizen, service: str, before: float, valid: float):
         got = self.by.get((citizen, service))
         if not got:
             return None
@@ -81,22 +94,20 @@ class Held:
         return got[1][k]
 
 
-def uses(inst: pd.DataFrame, reg: Register, held: Held) -> list:
+def uses(log: Log, reg: Register) -> list:
     """(index of A, index of B) for every "B uses A" the rule gives."""
     out = []
-    for b in range(len(inst)):
-        for a_service in reg.requires.get(inst.service_id[b], ()):
-            a = held.latest(inst.citizen_id[b], a_service, inst.start_day[b],
-                            reg.valid.get(a_service, 0))
+    for b in range(len(log)):
+        for a_service in reg.requires.get(log.service[b], ()):
+            a = log.latest(log.citizen[b], a_service, log.start[b], reg.valid.get(a_service, 0))
             if a is not None and a != b:
                 out.append((a, b))
     return out
 
 
-def register_only(inst: pd.DataFrame, links: list):
-    n = len(inst)
-    cases = inst.case_id.to_numpy()
-    partition = pd.DataFrame({"case_id": cases, "journey_id": components(n, links)})
+def register_only(log: Log, links: list):
+    n = len(log)
+    partition = pd.DataFrame({"case_id": log.case, "journey_id": components(n, links)})
     used_by: dict = {}
     is_used = np.zeros(n, dtype=bool)
     for a, b in links:
@@ -104,38 +115,41 @@ def register_only(inst: pd.DataFrame, links: list):
         is_used[a] = True
     rows = []
     for top in np.flatnonzero(~is_used):   # an instance nothing else uses
-        seen, stack = {top}, [top]
+        seen, stack = {int(top)}, [int(top)]
         while stack:
             for a in used_by.get(stack.pop(), ()):
                 if a not in seen:
                     seen.add(a)
                     stack.append(a)
-        rows += [(x, top) for x in seen]
-    journeys = pd.DataFrame({"case_id": cases[[x for x, _ in rows]],
+        rows += [(x, int(top)) for x in seen]
+    journeys = pd.DataFrame({"case_id": log.case[[x for x, _ in rows]],
                              "journey_id": [t for _, t in rows]})
     return journeys, partition
 
 
-def add_register(journeys: pd.DataFrame, inst: pd.DataFrame, reg: Register, held: Held):
-    """Add to each journey the valid earlier evidence its instances lack."""
-    row = pd.Series(np.arange(len(inst)), index=inst.case_id)
-    cases = inst.case_id.to_numpy()
+def add_register(journeys: pd.DataFrame, log: Log, reg: Register):
+    """Add to each journey the valid earlier evidence its instances lack.
+    Returns the enlarged journeys and how many memberships were added."""
+    groups: dict = {}
+    for case, jid in zip(journeys.case_id.astype(str), journeys.journey_id):
+        if case in log.row:
+            groups.setdefault(jid, []).append(log.row[case])
     added = []
-    for jid, members in journeys.groupby("journey_id").case_id:
-        idx = row[members].to_numpy()
-        have = set(inst.service_id[idx])
+    for jid, idx in groups.items():
+        have = {log.service[i] for i in idx}
         inside = set(idx)
         for b in idx:
-            for a_service in reg.requires.get(inst.service_id[b], ()):
+            for a_service in reg.requires.get(log.service[b], ()):
                 if a_service in have:
                     continue  # the journey has its own
-                a = held.latest(inst.citizen_id[b], a_service, inst.start_day[b],
-                                reg.valid.get(a_service, 0))
+                a = log.latest(log.citizen[b], a_service, log.start[b],
+                               reg.valid.get(a_service, 0))
                 if a is not None and a not in inside:
                     inside.add(a)
-                    added.append((cases[a], jid))
+                    added.append((log.case[a], jid))
     extra = pd.DataFrame(added, columns=["case_id", "journey_id"])
-    return pd.concat([journeys[["case_id", "journey_id"]], extra]).drop_duplicates(), len(extra)
+    both = pd.concat([journeys[["case_id", "journey_id"]].astype({"case_id": str}), extra])
+    return both.drop_duplicates(), len(extra)
 
 
 def main() -> None:
@@ -145,28 +159,20 @@ def main() -> None:
     ap.add_argument("--validity-days", type=float, default=90.0,
                     help="validity assumed where the register gives none")
     args = ap.parse_args()
-    inst = instances(os.path.join(args.folder, "events.csv"))
-    inst["case_id"] = inst.case_id.astype(str)
-    inst["service_id"] = inst.service_id.astype(str)
-    t0 = inst.start.min()
-    inst["start_day"] = (inst.start - t0).dt.total_seconds() / 86400
-    inst["end_day"] = (inst.end - t0).dt.total_seconds() / 86400
-    inst = inst.reset_index(drop=True)
+    log = Log(instances(os.path.join(args.folder, "events.csv")))
     reg = Register(args.catalogue, args.validity_days)
-    held = Held(inst)
 
-    links = uses(inst, reg, held)
-    journeys, partition = register_only(inst, links)
+    links = uses(log, reg)
+    journeys, partition = register_only(log, links)
     journeys.to_csv(os.path.join(args.folder, "journeys_register.csv"), index=False)
     partition.to_csv(os.path.join(args.folder, "journeys_register_partition.csv"), index=False)
-    print(f"register only: {len(links)} 'uses' links among {len(inst)} instances")
+    print(f"register only: {len(links)} 'uses' links among {len(log)} instances")
 
     for path in sorted(glob.glob(os.path.join(args.folder, "journeys*.csv"))):
         name = os.path.basename(path)[:-4]
         if "partition" in name or "register" in name:
             continue
-        found = pd.read_csv(path, dtype={"case_id": str})
-        merged, n = add_register(found, inst, reg, held)
+        merged, n = add_register(pd.read_csv(path, dtype={"case_id": str}), log, reg)
         merged.to_csv(os.path.join(args.folder, name + "+register.csv"), index=False)
         print(f"{name}: {n} instances added to journeys that lacked them")
 

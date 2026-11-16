@@ -5,8 +5,12 @@
   "seed": 1,
   "lang": "en",
   "rate_scale": 1.0,
+  "format": "csv",
   "scenarios": "scenarios.json"
  },
+ "log_files": [
+  "events.csv"
+ ],
  "catalogue": {
   "source": "MITOS, National Register of Administrative Procedures (https://mitos.gov.gr), via https://api.digigov.grnet.gr/v1/",
   "licence": "CC BY-SA 4.0",

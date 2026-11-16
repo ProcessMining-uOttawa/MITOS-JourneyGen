@@ -17,7 +17,7 @@ import datetime as dt
 import gzip
 import json
 import os
-import time
+import time  # noqa: F401 - also used by the command line's progress
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
@@ -40,8 +40,20 @@ def _paged(endpoint: str, limit: int) -> list:
     return rows
 
 
-def download(cache: str) -> None:
-    """Fill ``cache`` with the raw API answers; files already there are kept."""
+def download(cache: str, progress=None) -> list:
+    """Fill ``cache`` with the raw API answers; files already there are kept.
+    Returns what could not be fetched.
+
+    ``progress(done, total, failed)`` is called from the calling thread after
+    every document, and once with ``total`` 0 while the lists are being read.
+    It may raise to stop the download; what was fetched stays in the cache.
+
+    The cache is for resuming an interrupted download. Start a refresh from
+    an empty one, or documents fetched earlier are taken as current.
+    """
+    failed = []
+    if progress:
+        progress(0, 0, 0)
     for sub in ("proc", "proc_en"):
         os.makedirs(os.path.join(cache, sub), exist_ok=True)
     for name, endpoint, limit in (("list.json", "services", 100),
@@ -69,11 +81,20 @@ def download(cache: str) -> None:
                 err = exc
                 time.sleep(2 * (attempt + 1))
         print("could not fetch", sub, pid, repr(err)[:80])
+        failed.append((sub, pid))
 
     jobs = [(r["id"], "proc", "") for r in rows]
     jobs += [(r["id"], "proc_en", "?lang=en") for r in rows if r["title"].get("en")]
-    with ThreadPoolExecutor(3) as pool:
-        list(pool.map(one, jobs))
+    pool = ThreadPoolExecutor(3)
+    try:
+        for done, _ in enumerate(pool.map(one, jobs), 1):
+            if progress:
+                progress(done, len(jobs), len(failed))
+    except BaseException:
+        pool.shutdown(wait=False, cancel_futures=True)  # stopped: do not finish the queue
+        raise
+    pool.shutdown()
+    return failed
 
 
 def _load_dir(path: str) -> dict:
@@ -179,7 +200,24 @@ def main() -> None:
                                                   "catalogue.json.gz"))
     args = ap.parse_args()
     if not args.offline:
-        download(args.cache)
+        began, shown = time.perf_counter(), [-10.0]
+
+        def progress(done, total, failed):
+            now = time.perf_counter() - began
+            if not total:
+                print("Reading the lists of procedures and organisations", flush=True)
+            elif (now - shown[0] >= 10 and done >= 25) or done == total:
+                shown[0] = now
+                left = now * (total - done) / max(done, 1)
+                print(f"  {done:,} of {total:,} documents, {now / 60:.1f} min elapsed, "
+                      f"about {left / 60:.1f} min left"
+                      + (f", {failed} failed" if failed else ""), flush=True)
+
+        failed = download(args.cache, progress)
+        if failed:
+            # A procedure missing from the cache would look withdrawn.
+            raise SystemExit(f"{len(failed)} documents could not be fetched; the catalogue "
+                             "was not rebuilt. Run again: what was fetched is kept.")
     cat = build(args.cache)
     with gzip.open(args.out, "wt", encoding="utf-8") as f:
         json.dump(cat, f, ensure_ascii=False, separators=(",", ":"))
