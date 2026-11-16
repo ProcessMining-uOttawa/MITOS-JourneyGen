@@ -14,7 +14,7 @@ too.
 
 ## Quick start
 
-Python 3.9 or later. The generator uses the standard library only; the methods
+Python 3.10 or later. The generator uses the standard library only; the methods
 in `prototype/` need `pip install -r prototype/requirements.txt`.
 
 ```bash
@@ -260,7 +260,10 @@ leads to Generate, a scenario reads as a story until editing is switched on,
 remarks appear where values are set, a log is generated as CSV and as XES and
 then inspected and scored with and without the register, the app's log equals
 the command line's for the same seed, and a scenario naming a missing
-procedure is reported. The remarks themselves have their own tests. The catalogue
+procedure is reported. The remarks themselves have their own tests, and one
+test regenerates `out/` from seed 1 and compares it byte for byte.
+
+The same tests run on GitHub for every pull request, on Linux and on Windows. The catalogue
 download and comparison are tested against a made-up MITOS, with no network.
 
 ## Limitations
