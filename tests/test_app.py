@@ -128,6 +128,12 @@ def test_generate_inspect_and_score(fmt, log_file):
     assert not at.exception, at.exception
     scores = at.session_state["scores"]
     assert "Hawkes, overlapping" in scores and "fixed gap, 30 days" in scores
+    assert any(m.label == "Baseline to beat" for m in at.metric)
+    best = next(m for m in at.metric if m.label == "Best method so far")
+    assert "points on the baseline" in best.delta
+    table = " ".join(h.body for h in at.get("html"))
+    assert "Hawkes, overlapping + register" in table and "&#9733;" in table
+    assert "#16a34a" in table and "#dc2626" in table     # good and poor scores are coloured
     assert 0 < scores["Hawkes, overlapping"]["F1"] <= 1
     assert "register only, overlapping" in scores
     plus = scores["Hawkes, overlapping + register"]
