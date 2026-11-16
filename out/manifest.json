@@ -1,0 +1,42 @@
+{
+ "generator": "MITOS-JourneyGen generate.py",
+ "arguments": {
+  "citizens": 2000,
+  "seed": 1,
+  "lang": "en",
+  "rate_scale": 1.0,
+  "scenarios": "scenarios.json"
+ },
+ "catalogue": {
+  "source": "MITOS, National Register of Administrative Procedures (https://mitos.gov.gr), via https://api.digigov.grnet.gr/v1/",
+  "licence": "CC BY-SA 4.0",
+  "retrieved": "2026-11-16"
+ },
+ "citizens": 1777,
+ "instances": 10568,
+ "events": 77551,
+ "services": 55,
+ "episodes": 953,
+ "episodes_by_scenario": {
+  "death_of_relative": 163,
+  "birth_of_child": 82,
+  "marriage": 87,
+  "retirement": 57,
+  "job_loss": 123,
+  "moving_home": 135,
+  "starting_university": 52,
+  "passport": 254
+ },
+ "instances_by_origin": {
+  "scenario": 4725,
+  "background": 5843
+ },
+ "outcomes": {
+  "completed": 9562,
+  "unsuccessful": 590,
+  "abandoned": 416
+ },
+ "instances_shared_between_episodes": 8,
+ "background_instances_reused_by_an_episode": 16,
+ "labels_left_in_greek": 0
+}

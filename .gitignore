@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+# raw MITOS API answers cached by build_catalogue.py
+raw/
+# results the prototype methods write next to a log
+out*/journeys*.csv
+out*/pairs.csv
+out*/links.csv
+out*/hawkes_pairs.csv
+out*/latent_kinds.csv
+# other generated datasets; the default one in out/ is kept
+out_*/

@@ -1,0 +1,148 @@
+{
+  "_about": "Life-event scenarios for generate.py. Every procedure id is a MITOS id (https://mitos.gov.gr). A scenario lists the procedures a citizen may start after a life event: 'p' is the chance the citizen starts it, 'after' names scenario procedures that must have succeeded first, 'delay_days' is how long the citizen waits once it is possible (skewed towards the low end). Evidence that MITOS says a procedure requires is added automatically from the catalogue; 'evidence' overrides the chance for one evidence procedure (0 removes it). A citizen who already holds a valid result of an evidence procedure (for the validity MITOS gives, else 'evidence_validity_days') reuses it with 'reuse_evidence_probability', whichever episode or unrelated use produced it: that instance then belongs to both. 'single_use_evidence' lists procedures whose result serves one purpose only (solemn declaration, authorisation, fee). Rates, probabilities and delays are ASSUMPTIONS of this dataset, not measurements.",
+
+  "window": {"start": "2024-01-01", "years": 2},
+
+  "population": {
+    "age_groups": {"18-29": 0.16, "30-44": 0.24, "45-59": 0.27, "60-74": 0.21, "75+": 0.12},
+    "digital_propensity": {"18-29": 0.85, "30-44": 0.75, "45-59": 0.6, "60-74": 0.4, "75+": 0.2},
+    "regions": {
+      "Attica": 3792, "Central Macedonia": 1795, "Thessaly": 688, "Western Greece": 648,
+      "Crete": 624, "Eastern Macedonia and Thrace": 562, "Peloponnese": 539,
+      "Central Greece": 508, "South Aegean": 327, "Epirus": 319, "Western Macedonia": 255,
+      "Ionian Islands": 204, "North Aegean": 194
+    }
+  },
+
+  "behaviour": {
+    "evidence_probability": 0.7,
+    "alternative_evidence_probability": 0.2,
+    "reuse_evidence_probability": 0.6,
+    "evidence_validity_days": 60,
+    "single_use_evidence": ["265882", "621658", "370954"],
+    "evidence_depth": 2,
+    "abandon_probability": 0.04,
+    "negative_branch_weight": 0.06,
+    "retry_probability": 0.75,
+    "retry_delay_days": [1, 12],
+    "max_attempts": 3
+  },
+
+  "background": {
+    "_about": "Unrelated one-off uses of popular services, per citizen and year. Weights are relative.",
+    "rate_per_year": 1.5,
+    "services": {
+      "265882": 10, "439993": 8, "621658": 6, "955481": 6, "386812": 5, "370954": 5,
+      "977354": 4, "748694": 3, "239578": 3, "119372": 2, "874774": 2, "654156": 2,
+      "271392": 1, "251936": 1, "371686": 1, "591666": 1
+    }
+  },
+
+  "scenarios": [
+    {
+      "id": "death_of_relative",
+      "label": "Death of a close relative",
+      "rate_per_year": {"30-44": 0.03, "45-59": 0.05, "60-74": 0.06, "75+": 0.04},
+      "evidence": {"894344": 0.05, "371686": 0.3},
+      "procedures": [
+        {"id": "406191", "p": 1.0,  "delay_days": [0, 2]},
+        {"id": "167470", "p": 0.95, "after": ["406191"], "delay_days": [0, 5]},
+        {"id": "527543", "p": 0.85, "after": ["167470"], "delay_days": [2, 30]},
+        {"id": "478441", "p": 0.6,  "after": ["167470"], "delay_days": [2, 45]},
+        {"id": "754394", "p": 0.35, "after": ["167470"], "delay_days": [3, 40]},
+        {"id": "203638", "p": 0.45, "after": ["167470"], "delay_days": [20, 120]},
+        {"id": "214376", "p": 0.4,  "after": ["527543"], "delay_days": [10, 90]},
+        {"id": "806844", "p": 0.25, "after": ["527543"], "delay_days": [10, 120]},
+        {"id": "284209", "p": 0.15, "after": ["527543"], "delay_days": [20, 150]},
+        {"id": "503810", "p": 0.15, "after": ["527543"], "delay_days": [20, 110]},
+        {"id": "156524", "p": 0.5,  "after": ["527543"], "delay_days": [30, 240]},
+        {"id": "370899", "p": 0.2,  "after": ["527543"], "delay_days": [40, 240]}
+      ]
+    },
+    {
+      "id": "birth_of_child",
+      "label": "Birth of a child",
+      "rate_per_year": {"18-29": 0.04, "30-44": 0.06},
+      "evidence": {"167470": 0},
+      "procedures": [
+        {"id": "106576", "p": 1.0,  "delay_days": [0, 10]},
+        {"id": "955846", "p": 0.9,  "after": ["106576"], "delay_days": [0, 30]},
+        {"id": "525354", "p": 0.85, "after": ["106576"], "delay_days": [5, 60]},
+        {"id": "344972", "p": 0.6,  "after": ["106576"], "delay_days": [5, 90]},
+        {"id": "239578", "p": 0.5,  "after": ["106576"], "delay_days": [5, 60]},
+        {"id": "532784", "p": 0.45, "after": ["106576"], "delay_days": [5, 60]},
+        {"id": "751835", "p": 0.3,  "after": ["106576"], "delay_days": [30, 120]},
+        {"id": "389223", "p": 0.4,  "after": ["955846"], "delay_days": [90, 400]}
+      ]
+    },
+    {
+      "id": "marriage",
+      "label": "Getting married",
+      "rate_per_year": {"18-29": 0.03, "30-44": 0.04, "45-59": 0.01},
+      "evidence": {"167470": 0.03, "894344": 0.05, "912456": 0.05},
+      "procedures": [
+        {"id": "994264", "p": 1.0,  "delay_days": [0, 5]},
+        {"id": "742758", "p": 0.9,  "after": ["994264"], "delay_days": [7, 60]},
+        {"id": "912456", "p": 0.8,  "after": ["742758"], "delay_days": [1, 30]},
+        {"id": "955481", "p": 0.5,  "after": ["912456"], "delay_days": [5, 90]},
+        {"id": "344972", "p": 0.3,  "after": ["912456"], "delay_days": [10, 120]},
+        {"id": "949754", "p": 0.08, "after": ["912456"], "delay_days": [10, 120]}
+      ]
+    },
+    {
+      "id": "retirement",
+      "label": "Retiring from work",
+      "rate_per_year": {"60-74": 0.07},
+      "evidence": {"912456": 0.5, "371686": 0.4},
+      "procedures": [
+        {"id": "466053", "p": 1.0, "delay_days": [0, 30]}
+      ]
+    },
+    {
+      "id": "job_loss",
+      "label": "Losing a job",
+      "rate_per_year": {"18-29": 0.06, "30-44": 0.05, "45-59": 0.05},
+      "procedures": [
+        {"id": "356865", "p": 0.9,  "delay_days": [1, 30]},
+        {"id": "396514", "p": 0.5,  "delay_days": [10, 90]},
+        {"id": "374859", "p": 0.35, "delay_days": [10, 120]},
+        {"id": "732020", "p": 0.4,  "delay_days": [30, 200]},
+        {"id": "299474", "p": 0.15, "delay_days": [60, 300]},
+        {"id": "552851", "p": 0.12, "after": ["356865"], "delay_days": [330, 420]}
+      ]
+    },
+    {
+      "id": "moving_home",
+      "label": "Moving to another municipality",
+      "rate_per_year": {"18-29": 0.06, "30-44": 0.05, "45-59": 0.03, "60-74": 0.02, "75+": 0.01},
+      "procedures": [
+        {"id": "874774", "p": 0.8, "delay_days": [0, 30]},
+        {"id": "135604", "p": 0.6, "delay_days": [0, 45]},
+        {"id": "695066", "p": 0.3, "after": ["874774"], "delay_days": [5, 90]}
+      ]
+    },
+    {
+      "id": "starting_university",
+      "label": "Starting university",
+      "rate_per_year": {"18-29": 0.07},
+      "evidence": {"167470": 0, "106576": 0.1},
+      "procedures": [
+        {"id": "334740", "p": 1.0,  "delay_days": [0, 10]},
+        {"id": "223739", "p": 0.5,  "after": ["334740"], "delay_days": [5, 60]},
+        {"id": "992248", "p": 0.45, "after": ["334740"], "delay_days": [20, 150]},
+        {"id": "194517", "p": 0.12, "after": ["334740"], "delay_days": [30, 200]},
+        {"id": "591666", "p": 0.3,  "after": ["334740"], "delay_days": [150, 400]}
+      ]
+    },
+    {
+      "id": "passport",
+      "label": "Getting a passport",
+      "rate_per_year": {"18-29": 0.09, "30-44": 0.08, "45-59": 0.07, "60-74": 0.05, "75+": 0.02},
+      "evidence": {"199437": 0, "239578": 0.1},
+      "procedures": [
+        {"id": "199437", "p": 0.12, "delay_days": [0, 2]},
+        {"id": "144400", "p": 1.0,  "delay_days": [2, 20]}
+      ]
+    }
+  ]
+}
