@@ -130,7 +130,7 @@ def table(name: str, build, **kwargs) -> pd.DataFrame:
     if key not in ss or f"base:{key}" not in ss:
         ss[f"base:{key}"] = build()
     return st.data_editor(ss[f"base:{key}"], key=key, hide_index=True,
-                          use_container_width=True, **kwargs)
+                          width="stretch", **kwargs)
 
 
 def pick_procedure(label: str, key: str) -> str | None:
@@ -165,7 +165,7 @@ def steps_table(pid: str) -> None:
             "how": cat.en(s["how"]), "shortest": s["min"] or "", "longest": s["max"] or "",
             "alternative after": s["parent"] if s["parent"] is not None else "",
             "ends the procedure": "yes" if s["exit"] else ""} for s in steps]),
-            hide_index=True, use_container_width=True)
+            hide_index=True, width="stretch")
 
 
 # ------------------------------------------------------------------- sidebar
@@ -342,7 +342,7 @@ def view_start() -> None:
         with col.container(border=True):
             st.markdown(f"**{head}**")
             st.write(text)
-            st.button(label, on_click=goto, args=(view,), use_container_width=True,
+            st.button(label, on_click=goto, args=(view,), width="stretch",
                       type="primary" if view == "Generate" else "secondary")
     st.subheader("Then make it yours")
     c1, c2 = st.columns(2)
@@ -351,20 +351,20 @@ def view_start() -> None:
         st.write("Read what each life event does, change it, or build a new one from any "
                  "MITOS procedure. The page explains itself as you go.")
         st.button("Go to Scenarios", on_click=goto, args=("Scenarios",),
-                  use_container_width=True)
+                  width="stretch")
     with c2.container(border=True):
         st.markdown("**Population**")
         st.write("Who the citizens are, how they behave when they need a certificate, and how "
                  "much unrelated use surrounds the life events.")
         st.button("Go to Population", on_click=goto, args=("Population",),
-                  use_container_width=True)
+                  width="stretch")
     st.subheader("What is set up now")
     st.dataframe(pd.DataFrame([{
         "life event": s["label"], "happens to": who(s),
         "per 1,000 citizens a year": round(per_thousand(s), 1),
         "procedures": len(s["procedures"]),
         "evidence procedures": len(evidence_of(s))} for s in cfg["scenarios"]]),
-        hide_index=True, use_container_width=True)
+        hide_index=True, width="stretch")
     with st.expander("The words this tool uses"):
         st.markdown(GLOSSARY)
 
@@ -399,12 +399,12 @@ def view_scenarios() -> None:
         "procedures": len(s["procedures"]),
         "remarks": len(remarks(f"scenario:{n}"))} for n, s in enumerate(scenarios)],
         columns=["life event", "happens to", "per 1,000 citizens a year", "procedures",
-                 "remarks"]), hide_index=True, use_container_width=True)
+                 "remarks"]), hide_index=True, width="stretch")
 
     left, right = st.columns([3, 1])
     with right:
         st.write("")
-        if st.button("New life event", use_container_width=True,
+        if st.button("New life event", width="stretch",
                      help="Starts an empty scenario. You then add procedures by searching "
                           "the catalogue."):
             scenarios.append({"id": f"scenario_{len(scenarios) + 1}",
@@ -459,7 +459,7 @@ def view_scenarios() -> None:
     scen["label"] = c1.text_input("Name", scen["label"], key=f"label:{at}:{ss.version}")
     with c2:
         st.write("")
-        st.button("Delete this life event", use_container_width=True,
+        st.button("Delete this life event", width="stretch",
                   on_click=delete_scenario, args=(at,))
     st.markdown(f"**Life events per citizen and year, by age group** {YOURS}")
     st.caption("0.05 means 5 of every 100 citizens of that age each year. Leave 0 for ages it "
@@ -763,8 +763,8 @@ def view_generate() -> None:
                     icon=":material/warning:" if r["level"] == "warning"
                     else ":material/info:")
     c1, c2, _ = st.columns([1, 1, 4])
-    go = c1.button("Generate", type="primary", use_container_width=True)
-    stop = c2.button("Stop", use_container_width=True,
+    go = c1.button("Generate", type="primary", width="stretch")
+    stop = c2.button("Stop", width="stretch",
                      help="Stops a run in progress. Nothing is kept from a stopped run.")
     # One slot for the progress of a run and then for its result, so that a
     # new run replaces what the previous one left on the page.
@@ -904,7 +904,7 @@ def view_inspect() -> None:
         st.altair_chart(alt.Chart(counts).mark_bar().encode(
             x=alt.X("episodes:Q", title="Episodes"),
             y=alt.Y("scenario:N", sort="-x", title=None),
-            tooltip=["scenario", "episodes"]), use_container_width=True)
+            tooltip=["scenario", "episodes"]), width="stretch")
     with c2:
         st.subheader("How long an episode lasts")
         box = eps.groupby("scenario").span.quantile([0.1, 0.5, 0.9]).unstack().reset_index()
@@ -917,7 +917,7 @@ def view_inspect() -> None:
                                        "dot = median)"), x2="p90:Q")
             + base.mark_point(filled=True, size=70, color="black").encode(
                 x="median:Q", tooltip=["scenario", "p10", "median", "p90"]),
-            use_container_width=True)
+            width="stretch")
         st.caption("No single time window fits every scenario.")
 
     st.subheader("One citizen's timeline")
@@ -950,7 +950,7 @@ def view_inspect() -> None:
         strokeWidth=alt.value(2),
         tooltip=["case_id", "service", "start", "end", "role", "outcome", "belongs to",
                  "also in"]).properties(height=alt.Step(22))
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width="stretch")
     st.caption("Each bar is one service instance, coloured by the true episode it belongs to. "
                "A black outline marks an instance that another episode reused. A method sees "
                "none of the colours: finding them is the task.")
@@ -1018,13 +1018,13 @@ def view_score() -> None:
     c1.caption("Three methods that read only the log, and one that uses what MITOS says. The "
                "guide describes each one: what it assumes, how it decides, what it is good "
                "and bad at, and a table comparing them all.")
-    c2.link_button("Open the method guide", "?guide=methods", use_container_width=True,
+    c2.link_button("Open the method guide", "?guide=methods", width="stretch",
                    help="Opens in a new tab. The same text is docs/methods.md in the "
                         "repository.")
     log = inst[["case_id", "citizen_id", "service_id", "service", "start", "end"]]
     n = len(log)
     c1, c2, c3, c4 = st.columns(4)
-    if c1.button("Pair mixture", use_container_width=True,
+    if c1.button("Pair mixture", width="stretch",
                  help=f"Learns a time window for every pair of services. About "
                       f"{duration(max(2, n / 2200))} on this log."):
         import discover
@@ -1032,7 +1032,7 @@ def view_score() -> None:
             out = discover.discover(log)
         found["pair mixture, overlapping"] = out[2]
         found["pair mixture, partition"] = out[3]
-    if c2.button("Hawkes process", use_container_width=True,
+    if c2.button("Hawkes process", width="stretch",
                  help=f"Each instance is spontaneous or triggered by an earlier one. About "
                       f"{duration(max(2, n / 2500))} on this log."):
         import hawkes
@@ -1040,7 +1040,7 @@ def view_score() -> None:
             out = hawkes.fit(log)
         found["Hawkes, overlapping"] = out[1]
         found["Hawkes, partition"] = out[2][["case_id", "journey_id"]]
-    if c3.button("Latent life events", use_container_width=True,
+    if c3.button("Latent life events", width="stretch",
                  help=f"Learns the kinds of life event themselves. The slowest: about "
                       f"{duration(max(5, n / 750))} on this log."):
         import latent
@@ -1049,7 +1049,7 @@ def view_score() -> None:
             out = latent.fit(log)
         found["latent life events, overlapping"] = out[1]
         ss.kinds = out[0]
-    if c4.button("Register only", use_container_width=True,
+    if c4.button("Register only", width="stretch",
                  help="Nothing learnt: links an instance to the evidence MITOS says it "
                       "requires. A few seconds."):
         with st.status("Linking instances by the register's evidence rules", expanded=False):
@@ -1079,7 +1079,7 @@ def view_score() -> None:
     table_ = (table_ * 100).round(1)
     table_["in 2+ journeys"] = count
     table_ = table_.sort_values("F1", ascending=False)
-    st.dataframe(table_, use_container_width=True, column_config={
+    st.dataframe(table_, width="stretch", column_config={
         "precision": st.column_config.NumberColumn(format="%.1f%%"),
         "recall": st.column_config.NumberColumn(format="%.1f%%"),
         "F1": st.column_config.NumberColumn(format="%.1f%%"),
@@ -1108,7 +1108,7 @@ def view_score() -> None:
         with st.expander("Bundles the latent model found"):
             st.caption("Each kind is a bundle the model discovered: the services it brings, "
                        "how many per life event, and when.")
-            st.dataframe(ss.kinds, hide_index=True, use_container_width=True)
+            st.dataframe(ss.kinds, hide_index=True, width="stretch")
 
 
 def register_tools(rg, log: pd.DataFrame):
@@ -1182,7 +1182,7 @@ def view_bundles() -> None:
                                 "across organisations are where citizens carry documents "
                                 "between counters.")
     shown = cand[cand.different_organisations] if only_cross else cand
-    st.dataframe(shown.head(200), hide_index=True, use_container_width=True, column_config={
+    st.dataframe(shown.head(200), hide_index=True, width="stretch", column_config={
         "journeys": st.column_config.NumberColumn(
             help="Journeys where the first service is followed, at any distance, by the "
                  "second."),
@@ -1205,14 +1205,14 @@ def view_bundles() -> None:
         st.subheader("Most common sequences")
         st.caption("Whole journeys, as the services in order. A sequence many citizens "
                    "follow is a bundle that could be offered as one service.")
-        st.dataframe(bd.variants(log, 8), hide_index=True, use_container_width=True,
+        st.dataframe(bd.variants(log, 8), hide_index=True, width="stretch",
                      column_config={"share_of_kind": st.column_config.NumberColumn(
                          "share of kind", format="percent")})
     with c2:
         st.subheader("Requested again")
         st.caption("Services a citizen requests more than once inside one journey. Each "
                    "extra request is a duplication that integration would remove.")
-        st.dataframe(bd.repeated(log), hide_index=True, use_container_width=True,
+        st.dataframe(bd.repeated(log), hide_index=True, width="stretch",
                      column_config={"share_repeating": st.column_config.NumberColumn(
                          "share repeating", format="percent")})
 
@@ -1232,15 +1232,15 @@ def view_bundles() -> None:
     c1, c2, c3 = st.columns(3)
     c1.download_button("Journey log (XES, gzipped)", bd.to_xes(log),
                        file_name="journey_log.xes.gz", mime="application/gzip", type="primary",
-                       use_container_width=True)
+                       width="stretch")
     c2.download_button("Journey log (CSV)", bd.to_csv(log), file_name="journey_log.csv",
-                       mime="text/csv", use_container_width=True,
+                       mime="text/csv", width="stretch",
                        help="A CSV import reads one timestamp per row; use the XES to keep "
                             "both the start and the end.")
     c3.download_button("Integration candidates (CSV)",
                        cand.to_csv(index=False).encode("utf-8"),
                        file_name="integration_candidates.csv", mime="text/csv",
-                       use_container_width=True)
+                       width="stretch")
     st.caption("Remember what the log is: synthetic. The pairs above say what this generator "
                "was told plus what the method recovered, not what Greek citizens do.")
 
@@ -1305,8 +1305,8 @@ def refresh_from_mitos() -> None:
                    "of an hour) and replaces the catalogue if its content differs. The "
                    "scheduled job does the same every Monday; use this to be ahead of it.")
         c1, c2, _ = st.columns([1, 1, 4])
-        go = c1.button("Refresh", type="primary", use_container_width=True)
-        stop = c2.button("Stop", key="stop_refresh", use_container_width=True,
+        go = c1.button("Refresh", type="primary", width="stretch")
+        stop = c2.button("Stop", key="stop_refresh", width="stretch",
                          help="Stops a download in progress. What was fetched is kept for "
                               "the rest of the day, so a new refresh resumes.")
         area = st.empty()
@@ -1401,7 +1401,7 @@ def view_catalogue() -> None:
                 "scenario": x["scenario"], "id": x["id"], "procedure": x["title"],
                 "what changed": "; ".join(x["what"]),
                 "needs attention": "yes" if x["action"] else ""} for x in r["scenarios"]]),
-                hide_index=True, use_container_width=True)
+                hide_index=True, width="stretch")
         else:
             st.write("No bundled scenario is affected.")
         for key, head in (("new", "New"), ("withdrawn", "Withdrawn"), ("changed", "Changed")):
@@ -1410,7 +1410,7 @@ def view_catalogue() -> None:
                     st.dataframe(pd.DataFrame([{
                         "id": x["id"], "procedure": x["title"],
                         **({"what changed": "; ".join(x["what"])} if "what" in x else {})}
-                        for x in r[key]]), hide_index=True, use_container_width=True)
+                        for x in r[key]]), hide_index=True, width="stretch")
     history = os.path.join(HERE, "CATALOGUE_CHANGES.md")
     if os.path.exists(history):
         with st.expander("Earlier refreshes"):
