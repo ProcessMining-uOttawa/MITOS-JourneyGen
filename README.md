@@ -45,8 +45,9 @@ streamlit run app.py
 ```
 
 The app does what the command line does, with nothing of its own added. It
-opens on a **Start here** page: three steps to a first result with the bundled
-scenarios, and the words the tool uses.
+opens on a **Start here** page that introduces every entry of the menu: four
+steps to a first result with the bundled scenarios, the three views that shape
+them, and the words the tool uses.
 
 - **Scenarios.** Each life event is first told as a story in sentences: who it
   happens to, how often, which procedures it starts, how likely and when.
@@ -62,8 +63,15 @@ scenarios, and the words the tool uses.
 - **Inspect.** Counts, episodes per scenario, how long episodes last, and one
   citizen's instances on a time axis, coloured by true episode.
 - **Bundles to integrate.** Which services are used together and in what order,
-  from the true episodes or from a method's journeys: candidate pairs, common
-  sequences, repeated requests, and a journey-level log to open in PM4Py-UCM.
+  from the true episodes or from a method's journeys. It opens with the ten
+  best trade-offs and then every recommendation, by numbered kind, each with
+  its evidence, numbered effort and whether MITOS confirms it. Cells show
+  their whole content when pointed at, the full list can be sorted and
+  filtered by kind, and the thresholds can be adjusted. Kinds of
+  recommendation, effort and life events each keep one colour throughout,
+  always beside their number or name.
+  Below it, the candidate pairs, common sequences, repeated requests, and a
+  journey-level log to open in PM4Py-UCM.
 - **Score a method.** Upload a `journeys.csv` (`case_id`, `journey_id`) to score
   it against the ground truth and the fixed-gap baselines, or run a bundled
   method: the three that read only the log, and the register alone. A switch
@@ -412,6 +420,7 @@ the kind of life event as the case attribute `kind` when it is known.
 
 | File | Content |
 |---|---|
+| `integration_report.md`, `integration_opportunities.csv` | What could be integrated, as recommendations with the evidence for each. See below. |
 | `journey_log.xes.gz`, `journey_log.csv` | The service-level log. |
 | `integration_candidates.csv` | Ordered pairs of services used in the same journey: how many journeys, how often the second follows the first, lift over the second one's popularity, the wait between them, and whether they belong to different organisations. |
 | `journey_variants.csv` | The most common whole sequences of services. |
@@ -423,6 +432,69 @@ and *Declaration of a death* then *Death registration act* (152 journeys). The
 death registration act is requested again in 68% of the journeys that hold it:
 the duplication an integration would remove.
 
+### From tables to recommendations
+
+A table of pairs is not yet advice. A recommendation needs four things: that
+the services really go together, what kind of relation it is, what it costs
+citizens today, and how hard it would be. `integration_report.md` works those
+out and states each finding as a recommendation:
+
+| Recommendation | The pattern in the log |
+|---|---|
+| 1. One entry point for the life event | The services most journeys of a kind hold. |
+| 2. Offer as one step | Citizens always chain the two, in the same order. |
+| 3. Fetch automatically | Nearly every journey with the second has the first before it: an input the second could obtain itself. |
+| 4. One application for both | Citizens need both, in either order. |
+| 5. Reuse instead of asking again | A result the citizen already has is requested again in the same journey. |
+| 6. Fetch when needed | Citizens request the first almost only for the second, but only some need it: an occasional input. |
+
+The numbers order the kinds by how much each typically changes for citizens,
+1 the most. That order is a judgement, not a measurement.
+
+Each recommendation comes with its evidence in a sentence, the requests
+citizens would no longer make, the citizen-days between the two services today
+(an upper bound on time saved), whether MITOS confirms the dependency, and the
+effort, numbered the same way:
+
+| Effort | Means |
+|---|---|
+| 1 low | One organisation. |
+| 2 moderate | One organisation with a change of channel, or several services of one organisation behind one door. |
+| 3 high | Across organisations. |
+| 4 very high | Across organisations with a change of channel, or four or more organisations. |
+
+A pair that goes together in the log but is *not in MITOS* may be a dependency
+nobody wrote down.
+
+**The ten best trade-offs.** Every recommendation gets a score from 0 to 100,
+and the report opens with the ten highest, at most three per kind of journey
+and four of one kind of recommendation. The score multiplies three things:
+benefit (half of it reach, 35% requests saved, 15% waiting), certainty (full
+when MITOS confirms the pair, less when it does not or when the lift is low)
+and effort (full at level 1, down to 55% at level 4). The weights are choices;
+they make the ranking reproducible and open to argument, not right.
+
+On the default dataset the list opens with one entry point for getting a
+passport (233 journeys, score 45) and for a death in the family (153 journeys,
+score 40), then *Death registration act* and *Certificate of closest relatives*
+as one step (123 journeys, one organisation, confirmed by MITOS, score 38).
+
+**The ranking travels with the log.** `journey_log` carries it as attributes:
+
+| Attribute | On | Content |
+|---|---|---|
+| `top_opportunity` | journey | The best-ranked of the ten that this journey shows, or "none". |
+| `opportunity_rank` | journey | Its rank, 0 for none. |
+| `requests`, `organisations`, `repeated_requests` | journey | Numbers: requests made, bodies involved, requests for something already requested. |
+| `avoidable_request` | event | "yes" when a ranked recommendation would make this request unnecessary. |
+| `repeated_request` | event | "yes" for a second or later request of a service in the journey. |
+
+The recommendations come from the log alone; the register only annotates them
+(`--no-register` leaves that out). The thresholds are parameters of
+`bundles.opportunities` and are choices: someone who knows the services should
+set them. A log cannot tell an occasional input from a consequence, and it
+knows nothing of legal or technical feasibility.
+
 ### Opening it in PM4Py-UCM
 
 `journey_log.xes.gz` is an ordinary event log.
@@ -432,6 +504,15 @@ organisations as components, so the points where a journey crosses from one
 body to another are visible. Mine one model per kind (a model family
 partitioned on the case attribute `kind`, or a filter); all kinds in one model
 is too much to read. Use the XES rather than the CSV to keep both timestamps.
+
+The ranking attributes are case attributes there, so they can be used like any
+other: a model family partitioned on `top_opportunity` sets the journeys that
+show an opportunity beside those that do not, a filter keeps the journeys
+behind one recommendation, and the numeric ones serve as dashboard measures.
+With PM4Py-UCM 0.9.3 the log was read with all of them typed correctly, its
+partition advisor proposed `kind`, `requests`, `organisations`,
+`opportunity_rank` and `top_opportunity`, and a family was mined on
+`top_opportunity`.
 
 The app does the same in its **Bundles to integrate** view, for the true
 episodes or for any method run in *Score a method*, and offers the files as
