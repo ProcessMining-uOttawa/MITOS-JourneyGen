@@ -31,7 +31,6 @@ import build_catalogue  # noqa: E402
 import catalogue_changes  # noqa: E402
 import generate as gen  # noqa: E402
 
-MAX_CITIZENS = int(os.environ.get("MITOS_MAX_CITIZENS", "20000"))
 VIEWS = ["Start", "Scenarios", "Population", "Generate", "Inspect", "Score a method",
          "Bundles to integrate", "Catalogue"]
 MITOS = ":green-badge[From MITOS]"
@@ -241,7 +240,7 @@ with st.sidebar:
         ss.pop("result", None)
         st.rerun()
     st.divider()
-    st.caption(f"Catalogue of {catalogue().meta['retrieved']}, "
+    st.caption(f"Version {gen.__version__}. Catalogue of {catalogue().meta['retrieved']}, "
                f"{len(catalogue().procedures):,} procedures. "
                "Procedure data: MITOS, CC BY-SA 4.0.")
     st.caption(":material/contrast: Light or dark: open the menu at the top right, choose "
@@ -743,9 +742,9 @@ def view_generate() -> None:
     s = ss.settings
     c1, c2, c3 = st.columns(3)
     s["citizens"] = sticky(c1.number_input, "Citizens", "w_citizens",
-                           min(int(s["citizens"]), MAX_CITIZENS), min_value=10,
-                           max_value=MAX_CITIZENS, step=500,
-                           help=f"At most {MAX_CITIZENS:,} here. Larger logs: run "
+                           min(int(s["citizens"]), max_citizens()), min_value=10,
+                           max_value=max_citizens(), step=500,
+                           help=f"At most {max_citizens():,} here. Larger logs: run "
                                 "generate.py on your own machine.")
     s["seed"] = sticky(c2.number_input, "Seed", "w_seed", int(s["seed"]), min_value=0,
                        max_value=10 ** 9,
@@ -1644,6 +1643,15 @@ def runs_locally() -> bool:
     except Exception:  # noqa: BLE001
         return False
     return host.rsplit(":", 1)[0] in ("localhost", "127.0.0.1", "[::1]")
+
+
+def max_citizens() -> int:
+    """The largest population the app will generate. A hosted app keeps the
+    whole log in memory before it is downloaded, on a machine shared with
+    others, so it allows less than an app on the user's own computer."""
+    if os.environ.get("MITOS_MAX_CITIZENS"):
+        return int(os.environ["MITOS_MAX_CITIZENS"])
+    return 20000 if runs_locally() else 5000
 
 
 def refresh_from_mitos() -> None:

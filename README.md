@@ -44,6 +44,9 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+Streamlit's default port, 8501, is often taken by another app. `run_local.cmd`
+(Windows) and `run_local.sh` start this one on port 8612 instead.
+
 The app does what the command line does, with nothing of its own added. It
 opens on a **Start here** page that introduces every entry of the menu: four
 steps to a first result with the bundled scenarios, the three views that shape
@@ -104,8 +107,10 @@ a path that climbs from one service to the next and ends in a ring, where the
 services come together. `python assets/make_logo.py` rewrites the files.
 
 *Save project* writes the scenarios, population and generation settings to one
-file; *Load project* restores them. The app allows up to 20,000 citizens; set
-`MITOS_MAX_CITIZENS` to change that, or use the command line.
+file; *Load project* restores them. The app allows up to 20,000 citizens on
+your own machine and 5,000 when hosted, where the whole log is held in memory
+on a shared machine; set `MITOS_MAX_CITIZENS` to change that, or use the
+command line.
 
 With the defaults (2,000 citizens, seed 1) the log has 77,551 events in 10,568
 service instances of 55 services, used by 1,777 citizens (the others used no
@@ -270,6 +275,32 @@ holds unofficial English renderings, written for this dataset, of the
 remaining titles and steps used by the bundled scenarios. A label with no
 English stays in Greek; `--describe` lists those.
 
+## Releases and the hosted app
+
+The version is `__version__` in `generate.py`; `CHANGELOG.md` says what each
+release changed. To release: set the version, add its section to the changelog,
+merge, then publish a GitHub release whose tag is `v` and the version.
+
+Publishing does the rest. The *Release* workflow checks that the tag is the
+version the code states and moves the `release` branch to it. A hosted app that
+watches that branch updates by itself, with every release and with nothing
+else: work merged into `main` stays out of sight until it is released. The
+weekly catalogue refresh also writes the new catalogue to `release`, so the
+hosted app follows MITOS between releases. Nobody commits to `release` by hand.
+
+### On Streamlit Community Cloud
+
+1. At [share.streamlit.io](https://share.streamlit.io), create an app from this
+   repository, with branch `release` and main file `app.py`. Deploying from a
+   private repository needs administrator rights on it, and a free account can
+   hold one private app.
+2. Choose who may see it under the app's sharing settings; an app from a
+   private repository starts private.
+3. Nothing else: it installs `requirements.txt` and reads `.streamlit/config.toml`.
+
+There the app hides *Refresh from MITOS now* and allows 5,000 citizens. To
+change the limit, add `MITOS_MAX_CITIZENS = "..."` to the app's secrets.
+
 ## Tests
 
 ```bash
@@ -286,6 +317,9 @@ test regenerates `out/` from seed 1 and compares it byte for byte.
 
 The same tests run on GitHub for every pull request, on Linux and on Windows. The catalogue
 download and comparison are tested against a made-up MITOS, with no network.
+Others check what a release and a hosted deployment rely on: the version and
+the changelog agree, the committed configuration fixes no port, and the
+release workflow moves the branch the hosted app watches.
 
 ## Limitations
 

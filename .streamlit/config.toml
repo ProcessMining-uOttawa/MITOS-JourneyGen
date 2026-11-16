@@ -1,7 +1,6 @@
-# Streamlit's default port, 8501, is often taken by another app (PM4Py-UCM
-# for one). A --server.port on the command line overrides this.
-[server]
-port = 8612
+# No [server] port here: a fixed port stops the app from starting on
+# Streamlit Community Cloud. To run it locally on another port than the
+# default 8501, use run_local.cmd or run_local.sh.
 
 # Two themes, so that the viewer can choose: the menu at the top right, then
 # Settings. The accent is the blue of the Greek flag, lighter on dark so that

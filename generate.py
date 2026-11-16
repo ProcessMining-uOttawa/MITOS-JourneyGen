@@ -31,6 +31,8 @@ import re
 import time
 from xml.sax.saxutils import quoteattr
 
+__version__ = "0.1.0"
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DAY = 86400.0
 
@@ -483,7 +485,8 @@ class Generator:
         for i in self.instances:
             outcomes[i["outcome"]] = outcomes.get(i["outcome"], 0) + 1
         manifest = {
-            "generator": "MITOS-JourneyGen generate.py", "arguments": args,
+            "generator": "MITOS-JourneyGen generate.py", "version": __version__,
+            "arguments": args,
             "log_files": log_files,
             "catalogue": cat.meta, "citizens": len({i["citizen"]["id"] for i in self.instances}),
             "instances": len(self.instances), "events": self.n_events,
@@ -732,6 +735,7 @@ def describe(cat: Catalogue, cfg: dict) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--version", action="version", version=__version__)
     ap.add_argument("--citizens", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--out", default=os.path.join(HERE, "out"))
