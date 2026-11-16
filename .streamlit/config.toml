@@ -2,3 +2,7 @@
 # for one). A --server.port on the command line overrides this.
 [server]
 port = 8612
+
+# The accent of buttons and selections: the blue of the Greek flag.
+[theme]
+primaryColor = "#0D5EAF"

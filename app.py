@@ -36,6 +36,19 @@ VIEWS = ["Start", "Scenarios", "Population", "Generate", "Inspect", "Score a met
          "Bundles to integrate", "Catalogue"]
 MITOS = ":green-badge[From MITOS]"
 YOURS = ":orange-badge[Your assumption]"
+ICONS = {
+    "Start": ":material/flag:", "Scenarios": ":material/route:",
+    "Population": ":material/groups:", "Generate": ":material/play_circle:",
+    "Inspect": ":material/monitoring:", "Score a method": ":material/target:",
+    "Bundles to integrate": ":material/hub:", "Catalogue": ":material/menu_book:",
+}
+# One colour per kind of recommendation (by its number) and per level of
+# effort. Colour never stands alone: the number and the words stay.
+KIND_COLOURS = {"1": "#7c3aed", "2": "#2563eb", "3": "#0891b2", "4": "#db2777",
+                "5": "#a16207", "6": "#64748b"}
+EFFORT_COLOURS = {"1": "#16a34a", "2": "#ca8a04", "3": "#ea580c", "4": "#dc2626"}
+LIFE_PALETTE = ["#4c78a8", "#f58518", "#54a24b", "#e45756", "#72b7b2", "#b279a2",
+                "#9d755d", "#eeca3b", "#ff9da6", "#bab0ac"]
 
 st.set_page_config(page_title="MITOS-JourneyGen", layout="wide")
 
@@ -120,6 +133,14 @@ def forget(*keys: str) -> None:
 SETTING_KEYS = ("w_citizens", "w_seed", "w_rate_scale", "w_format", "w_lang")
 
 
+def life_colours() -> dict:
+    """The colour of each life event, the same in every chart and table."""
+    out = {}
+    for n, scen in enumerate(ss.cfg["scenarios"]):
+        out[scen["label"]] = out[scen["id"]] = LIFE_PALETTE[n % len(LIFE_PALETTE)]
+    return out
+
+
 def table(name: str, build, **kwargs) -> pd.DataFrame:
     """An editable table whose edits are written back to the config.
 
@@ -173,7 +194,8 @@ with st.sidebar:
     st.title("MITOS-JourneyGen")
     st.caption("Synthetic logs of citizens using Greek public services, with ground truth.")
     view = st.radio("View", VIEWS, key="view", label_visibility="collapsed",
-                    format_func=lambda v: "Start here" if v == "Start" else v)
+                    format_func=lambda v: f"{ICONS[v]} "
+                    + ("Start here" if v == "Start" else v))
     st.divider()
     st.download_button(
         "Save project", json.dumps({"mitos_journeygen_project": 1, "config": cfg,
@@ -315,7 +337,7 @@ def delete_scenario(at: int) -> None:
 
 # --------------------------------------------------------------------- start
 def view_start() -> None:
-    st.header("Start here")
+    st.header(f"{ICONS['Start']} Start here")
     st.markdown(
         "This tool makes **synthetic logs of citizens using Greek public services**. Some "
         "services are used together because of a life event, such as a death in the family; "
@@ -340,27 +362,27 @@ def view_start() -> None:
     ]
     for col, (head, text, view, label) in zip(st.columns(4), steps):
         with col.container(border=True):
-            st.markdown(f"**{head}**")
+            st.markdown(f"**{ICONS[view]} {head}**")
             st.write(text)
             st.button(label, on_click=goto, args=(view,), width="stretch",
                       type="primary" if view == "Generate" else "secondary")
     st.subheader("Then make it yours")
     c1, c2 = st.columns(2)
     with c1.container(border=True):
-        st.markdown("**Scenarios**")
+        st.markdown(f"**{ICONS['Scenarios']} Scenarios**")
         st.write("Read what each life event does, change it, or build a new one from any "
                  "MITOS procedure. The page explains itself as you go.")
         st.button("Go to Scenarios", on_click=goto, args=("Scenarios",),
                   width="stretch")
     with c2.container(border=True):
-        st.markdown("**Population**")
+        st.markdown(f"**{ICONS['Population']} Population**")
         st.write("Who the citizens are, how they behave when they need a certificate, and how "
                  "much unrelated use surrounds the life events.")
         st.button("Go to Population", on_click=goto, args=("Population",),
                   width="stretch")
     st.subheader("And keep it current")
     with st.container(border=True):
-        st.markdown("**Catalogue**")
+        st.markdown(f"**{ICONS['Catalogue']} Catalogue**")
         st.write("The procedures come from a snapshot of MITOS, refreshed every week. See "
                  "its date, what the last refresh changed and which life events that "
                  "touches, or look up any procedure and its steps.")
@@ -381,7 +403,7 @@ def view_start() -> None:
 
 # ----------------------------------------------------------------- scenarios
 def view_scenarios() -> None:
-    st.header("Scenarios")
+    st.header(f"{ICONS['Scenarios']} Scenarios")
     st.markdown(
         "A **scenario** is the recipe for one kind of life event: which procedures a citizen "
         "starts when it happens, how likely each one is, and when. The log is built by letting "
@@ -464,7 +486,7 @@ def view_scenarios() -> None:
         return
 
     # ---- step 1 ------------------------------------------------------------
-    st.subheader("Step 1. Name it and say how often it happens")
+    st.subheader(":material/looks_one: Step 1. Name it and say how often it happens")
     c1, c2 = st.columns([3, 1])
     scen["label"] = c1.text_input("Name", scen["label"], key=f"label:{at}:{ss.version}")
     with c2:
@@ -485,7 +507,7 @@ def view_scenarios() -> None:
             scen["rate_per_year"].pop(age, None)
 
     # ---- step 2 ------------------------------------------------------------
-    st.subheader("Step 2. Choose the procedures it starts")
+    st.subheader(":material/looks_two: Step 2. Choose the procedures it starts")
     st.caption(f"{MITOS} the procedures and how many steps they have.  {YOURS} the chance, "
                "the order and the wait.")
     with st.expander("Add a procedure from the catalogue", expanded=not scen["procedures"]):
@@ -546,7 +568,7 @@ def view_scenarios() -> None:
                    "dropped when that one is skipped or fails.")
 
     # ---- step 3 ------------------------------------------------------------
-    st.subheader("Step 3. Check the evidence (optional)")
+    st.subheader(":material/looks_3: Step 3. Check the evidence (optional)")
     st.caption(f"{MITOS} which procedure requires which.  {YOURS} the chance that the citizen "
                "has to request it. You can leave this alone. Set a chance to 0 to remove "
                "evidence that applies only in special cases: MITOS lists a death certificate "
@@ -579,7 +601,7 @@ def view_scenarios() -> None:
         st.caption("None of these procedures requires another one.")
 
     # ---- step 4 ------------------------------------------------------------
-    st.subheader("Step 4. Look inside a procedure (optional)")
+    st.subheader(":material/looks_4: Step 4. Look inside a procedure (optional)")
     st.caption("The steps an instance will go through, as MITOS publishes them. Where a step "
                "has alternatives, one is chosen; a failure alternative is chosen rarely.")
     ids = [x["id"] for x in scen["procedures"] if x["id"] in catalogue().procedures]
@@ -591,7 +613,7 @@ def view_scenarios() -> None:
 
 # ---------------------------------------------------------------- population
 def view_population() -> None:
-    st.header("Population and behaviour")
+    st.header(f"{ICONS['Population']} Population and behaviour")
     st.markdown("Who the citizens are, how they behave when a procedure needs a certificate, "
                 "and how much unrelated use surrounds the life events. The values set here "
                 "work as they are; change them to make the problem easier or harder.")
@@ -696,7 +718,7 @@ def duration(seconds: float) -> str:
 
 
 def view_generate() -> None:
-    st.header("Generate")
+    st.header(f"{ICONS['Generate']} Generate")
     st.markdown("Choose how large a log to make and press **Generate**. The defaults give a "
                 "small log in a few seconds, which is the right place to start.")
     s = ss.settings
@@ -773,8 +795,9 @@ def view_generate() -> None:
                     icon=":material/warning:" if r["level"] == "warning"
                     else ":material/info:")
     c1, c2, _ = st.columns([1, 1, 4])
-    go = c1.button("Generate", type="primary", width="stretch")
-    stop = c2.button("Stop", width="stretch",
+    go = c1.button("Generate", type="primary", width="stretch",
+                   icon=":material/play_arrow:")
+    stop = c2.button("Stop", width="stretch", icon=":material/stop:",
                      help="Stops a run in progress. Nothing is kept from a stopped run.")
     # One slot for the progress of a run and then for its result, so that a
     # new run replaces what the previous one left on the page.
@@ -793,6 +816,7 @@ def view_generate() -> None:
                    f"{m['citizens']:,} citizens, {m['episodes']:,} episodes, generated in "
                    f"{duration(r['seconds'])}.")
         box.download_button("Download the dataset (zip)", r["zip"],
+                            icon=":material/download:",
                            file_name=f"journeygen_{m['arguments']['citizens']}c_"
                                      f"seed{m['arguments']['seed']}.zip",
                            mime="application/zip", type="primary")
@@ -886,19 +910,19 @@ def need_result() -> bool:
 
 
 def view_inspect() -> None:
-    st.header("Inspect")
+    st.header(f"{ICONS['Inspect']} Inspect")
     if not need_result():
         return
     r = ss.result
     m, inst, eps = r["manifest"], r["inst"], r["eps"]
     labels = {s["id"]: s["label"] for s in cfg["scenarios"]}
     cols = st.columns(5)
-    cols[0].metric("Events", f"{m['events']:,}")
-    cols[1].metric("Service instances", f"{m['instances']:,}")
-    cols[2].metric("Citizens", f"{m['citizens']:,}")
-    cols[3].metric("Episodes", f"{m['episodes']:,}")
+    cols[0].metric("Events", f"{m['events']:,}", border=True)
+    cols[1].metric("Service instances", f"{m['instances']:,}", border=True)
+    cols[2].metric("Citizens", f"{m['citizens']:,}", border=True)
+    cols[3].metric("Episodes", f"{m['episodes']:,}", border=True)
     shared = m["instances_shared_between_episodes"] + m["background_instances_reused_by_an_episode"]
-    cols[4].metric("Shared instances", f"{shared:,}",
+    cols[4].metric("Shared instances", f"{shared:,}", border=True,
                    help="Instances that belong to more than one episode, or background uses "
                         "that an episode reused.")
     st.caption(f"{m['instances_by_origin']['scenario']:,} instances belong to episodes and "
@@ -907,6 +931,10 @@ def view_inspect() -> None:
 
     eps = eps.assign(span=eps.span_days.astype(float), scenario=eps.scenario.map(labels).fillna(
         eps.scenario))
+    colours = life_colours()
+    life_scale = alt.Scale(domain=sorted(eps.scenario.unique()),
+                           range=[colours.get(x, "#888888")
+                                  for x in sorted(eps.scenario.unique())])
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Episodes per scenario")
@@ -914,6 +942,7 @@ def view_inspect() -> None:
         st.altair_chart(alt.Chart(counts).mark_bar().encode(
             x=alt.X("episodes:Q", title="Episodes"),
             y=alt.Y("scenario:N", sort="-x", title=None),
+            color=alt.Color("scenario:N", scale=life_scale, legend=None),
             tooltip=["scenario", "episodes"]), width="stretch")
     with c2:
         st.subheader("How long an episode lasts")
@@ -922,13 +951,15 @@ def view_inspect() -> None:
         base = alt.Chart(box).encode(y=alt.Y("scenario:N", sort=alt.SortField("median"),
                                              title=None))
         st.altair_chart(
-            base.mark_rule(strokeWidth=3).encode(
+            base.mark_rule(strokeWidth=5, opacity=0.75).encode(
                 x=alt.X("p10:Q", title="Days from first start to last end (10% to 90%, "
-                                       "dot = median)"), x2="p90:Q")
+                                       "dot = median)"), x2="p90:Q",
+                color=alt.Color("scenario:N", scale=life_scale, legend=None))
             + base.mark_point(filled=True, size=70, color="black").encode(
                 x="median:Q", tooltip=["scenario", "p10", "median", "p90"]),
             width="stretch")
-        st.caption("No single time window fits every scenario.")
+        st.caption("No single time window fits every scenario. Each life event keeps "
+                   "its colour across these charts and the tables of *Bundles to integrate*.")
 
     st.subheader("One citizen's timeline")
     per = inst[inst.episode_id != ""].groupby("citizen_id").episode_id.nunique()
@@ -968,7 +999,7 @@ def view_inspect() -> None:
 
 # --------------------------------------------------------------------- score
 def view_score() -> None:
-    st.header("Score a method")
+    st.header(f"{ICONS['Score a method']} Score a method")
     if not need_result():
         return
     import register as rg
@@ -1029,6 +1060,7 @@ def view_score() -> None:
                "guide describes each one: what it assumes, how it decides, what it is good "
                "and bad at, and a table comparing them all.")
     c2.link_button("Open the method guide", "?guide=methods", width="stretch",
+                   icon=":material/menu_book:",
                    help="Opens in a new tab. The same text is docs/methods.md in the "
                         "repository.")
     log = inst[["case_id", "citizen_id", "service_id", "service", "start", "end"]]
@@ -1132,7 +1164,7 @@ def register_tools(rg, log: pd.DataFrame):
 
 # ------------------------------------------------------------------- bundles
 def view_bundles() -> None:
-    st.header("Bundles to integrate")
+    st.header(f"{ICONS['Bundles to integrate']} Bundles to integrate")
     if not need_result():
         return
     import bundles as bd
@@ -1177,10 +1209,10 @@ def view_bundles() -> None:
         st.info("No journey has that many instances.")
         return
     cols = st.columns(4)
-    cols[0].metric("Journeys", f"{log['case:concept:name'].nunique():,}")
-    cols[1].metric("Service instances", f"{len(log):,}")
-    cols[2].metric("Services", f"{log['concept:name'].nunique():,}")
-    cols[3].metric("Kinds", f"{log['case:kind'].nunique():,}")
+    cols[0].metric("Journeys", f"{log['case:concept:name'].nunique():,}", border=True)
+    cols[1].metric("Service instances", f"{len(log):,}", border=True)
+    cols[2].metric("Services", f"{log['concept:name'].nunique():,}", border=True)
+    cols[3].metric("Kinds", f"{log['case:kind'].nunique():,}", border=True)
 
     # ---- recommendations ----------------------------------------------------
     st.subheader("Integration opportunities")
@@ -1237,9 +1269,9 @@ def view_bundles() -> None:
                    "of one kind of recommendation, so the list is not ten versions of one "
                    "finding. Point at a cell to read all of it.")
         hover_table(best, {"rank": "rank", "score": "score", **shown_cols},
-                    {"rank": 4, "score": 5, "recommendation": 13, "kind": 9, "what": 24,
-                     "journeys": 6, "requests_saved": 7, "difficulty": 12, "register": 8,
-                     "evidence": 12})
+                    {"rank": 4, "score": 6, "recommendation": 13, "kind": 10, "what": 23,
+                     "journeys": 6, "requests_saved": 7, "difficulty": 12, "register": 9,
+                     "evidence": 10})
         with st.expander("How the score is made"):
             st.markdown(
                 "- **Benefit.** Half is reach: the journeys concerned, against the largest "
@@ -1253,14 +1285,29 @@ def view_bundles() -> None:
                 "ranking reproducible and open to argument, not right.")
         st.markdown("**All opportunities**")
         counts = opp.recommendation.value_counts()
-        pick = st.multiselect("Show", list(bd.TYPES.values()),
-                              default=[t for t in bd.TYPES.values() if t in counts],
-                              format_func=lambda t: f"{t} ({counts.get(t, 0)})")
-        view = opp[opp.recommendation.isin(pick)].sort_values(
-            ["recommendation", "score"], ascending=[True, False])
+        c1, c2 = st.columns([3, 1])
+        pick = c1.pills("Show", [t for t in bd.TYPES.values() if t in counts],
+                        selection_mode="multi",
+                        default=[t for t in bd.TYPES.values() if t in counts],
+                        format_func=lambda t: f"{t} ({counts.get(t, 0)})")
+        orders = {
+            "Kind of recommendation": (["recommendation", "score"], [True, False]),
+            "Score, highest first": (["score", "journeys"], [False, False]),
+            "Journeys, most first": (["journeys", "score"], [False, False]),
+            "Requests saved, most first": (["requests_saved", "score"], [False, False]),
+            "Effort, lowest first": (["effort_level", "score"], [True, False]),
+            "Effort, highest first": (["effort_level", "score"], [False, False]),
+            "Kind of journey": (["kind", "score"], [True, False]),
+        }
+        by, ascending = orders[c2.selectbox("Sort by", list(orders))]
+        view = opp[opp.recommendation.isin(pick or [])].sort_values(by, ascending=ascending)
         hover_table(view.head(150), {"score": "score", **shown_cols},
-                    {"score": 5, "recommendation": 14, "kind": 9, "what": 25, "journeys": 6,
-                     "requests_saved": 7, "difficulty": 13, "register": 8, "evidence": 13})
+                    {"score": 6, "recommendation": 14, "kind": 10, "what": 24, "journeys": 6,
+                     "requests_saved": 7, "difficulty": 13, "register": 9, "evidence": 11})
+        st.caption("Colours: each kind of recommendation has its own; effort runs from green "
+                   "(1 low) to red (4 very high); a green tick marks a pair MITOS confirms "
+                   "and an amber question mark one it does not list. The bar beside a score "
+                   "is its length against the best in the table.")
         if len(view) > 150:
             st.caption(f"The first 150 of {len(view)}. The CSV has them all.")
         if use_register and (opp.register == "not in MITOS").any():
@@ -1273,11 +1320,13 @@ def view_bundles() -> None:
             ["top_rank", "score"], ascending=[True, False], na_position="last")
         c1, c2 = st.columns(2)
         c1.download_button("Report (Markdown)", bd.report(opp, log, source).encode("utf-8"),
+                           icon=":material/description:",
                            file_name="integration_report.md", mime="text/markdown",
                            type="primary", width="stretch",
                            help="The best trade-offs and every recommendation written out, "
                                 "to hand on.")
         c2.download_button("Opportunities (CSV)", ranked.to_csv(index=False).encode("utf-8"),
+                           icon=":material/download:",
                            file_name="integration_opportunities.csv", mime="text/csv",
                            width="stretch")
 
@@ -1348,6 +1397,7 @@ def view_bundles() -> None:
     c1, c2, c3 = st.columns(3)
     tagged = bd.annotate(log, best) if not opp.empty else log
     c1.download_button("Journey log (XES, gzipped)", bd.to_xes(tagged),
+                       icon=":material/download:",
                        file_name="journey_log.xes.gz", mime="application/gzip", type="primary",
                        width="stretch")
     c2.download_button("Journey log (CSV)", bd.to_csv(tagged), file_name="journey_log.csv",
@@ -1382,13 +1432,39 @@ def kind_names(kinds: pd.DataFrame | None) -> dict:
 def hover_table(df: pd.DataFrame, columns: dict, widths: dict) -> None:
     """A table whose cells are cut to one line and show their whole content
     when pointed at. ``columns`` maps a column to its heading, ``widths`` to
-    its share of the width."""
+    its share of the width. Kinds of recommendation, effort, the register and
+    the score are drawn with a colour or a mark beside their text."""
     import html
 
     total = sum(widths.values())
+    life = life_colours()
+    best = max(int(df["score"].max()), 1) if "score" in df.columns and len(df) else 1
     head = "".join(f'<th style="width:{100 * widths[c] / total:.1f}%" '
                    f'title="{html.escape(h, quote=True)}">{html.escape(h)}</th>'
                    for c, h in columns.items())
+
+    def pill(text: str, colour: str) -> str:
+        return f'<span class="jg-pill" style="--c:{colour}">{text}</span>'
+
+    def draw(column: str, text: str) -> str:
+        safe = html.escape(text)
+        if column == "recommendation":
+            return pill(safe, KIND_COLOURS.get(text[:1], "#64748b"))
+        if column == "difficulty":
+            return pill(safe, EFFORT_COLOURS.get(text[:1], "#64748b"))
+        if column == "score":
+            return (f'<span class="jg-score"><b>{safe}</b><span class="jg-bar"><span '
+                    f'style="width:{100 * int(text) / best:.0f}%"></span></span></span>')
+        if column == "rank":
+            return f'<span class="jg-rank">{safe}</span>'
+        if column == "register":
+            mark, colour = {"confirmed by MITOS": ("&#10003;", "#16a34a"),
+                            "not in MITOS": ("?", "#d97706")}.get(text, ("&ndash;", "#94a3b8"))
+            return f'<b style="color:{colour}">{mark}</b> {safe}'
+        if column == "kind" and text in life:
+            return f'<span class="jg-dot" style="background:{life[text]}"></span>{safe}'
+        return safe
+
     body = []
     for row in df.itertuples(index=False):
         cells = []
@@ -1396,7 +1472,7 @@ def hover_table(df: pd.DataFrame, columns: dict, widths: dict) -> None:
             value = getattr(row, c)
             text = f"{value:,}" if isinstance(value, int) and not isinstance(
                 value, bool) and c not in ("rank", "score") else str(value)
-            cells.append(f'<td title="{html.escape(text, quote=True)}">{html.escape(text)}</td>')
+            cells.append(f'<td title="{html.escape(text, quote=True)}">{draw(c, text)}</td>')
         body.append("<tr>" + "".join(cells) + "</tr>")
     st.html(
         '<style>.jg-table{width:100%;table-layout:fixed;border-collapse:collapse;'
@@ -1404,7 +1480,18 @@ def hover_table(df: pd.DataFrame, columns: dict, widths: dict) -> None:
         'border-bottom:1px solid rgba(128,128,128,0.25);white-space:nowrap;overflow:hidden;'
         'text-overflow:ellipsis}.jg-table th{font-weight:600;'
         'border-bottom:1px solid rgba(128,128,128,0.6)}'
-        '.jg-table tr:hover td{background:rgba(128,128,128,0.10)}</style>'
+        '.jg-table tr:hover td{background:rgba(128,128,128,0.10)}'
+        '.jg-pill{display:inline-block;max-width:100%;box-sizing:border-box;overflow:hidden;'
+        'text-overflow:ellipsis;vertical-align:bottom;padding:0 8px;border-radius:9px;'
+        'border-left:4px solid var(--c);'
+        'background:color-mix(in srgb,var(--c) 16%,transparent)}'
+        '.jg-score{display:flex;align-items:center;gap:6px}.jg-score b{min-width:1.5em}'
+        '.jg-bar{flex:1;height:6px;border-radius:3px;background:rgba(128,128,128,0.2)}'
+        '.jg-bar span{display:block;height:100%;border-radius:3px;background:#0D5EAF}'
+        '.jg-rank{display:inline-block;min-width:1.6em;text-align:center;font-weight:700;'
+        'border-radius:50%;background:rgba(13,94,175,0.15)}'
+        '.jg-dot{display:inline-block;width:9px;height:9px;border-radius:50%;'
+        'margin-right:6px}</style>'
         f'<table class="jg-table"><thead><tr>{head}</tr></thead>'
         f'<tbody>{"".join(body)}</tbody></table>')
 
@@ -1521,13 +1608,13 @@ def refresh_from_mitos() -> None:
 
 
 def view_catalogue() -> None:
-    st.header("Catalogue")
+    st.header(f"{ICONS['Catalogue']} Catalogue")
     cat = catalogue()
     linked = sum(1 for p in cat.procedures.values() if p["requires"])
     c1, c2, c3 = st.columns(3)
-    c1.metric("Snapshot of MITOS", cat.meta["retrieved"])
-    c2.metric("Procedures", f"{len(cat.procedures):,}")
-    c3.metric("With evidence links", f"{linked:,}")
+    c1.metric("Snapshot of MITOS", cat.meta["retrieved"], border=True)
+    c2.metric("Procedures", f"{len(cat.procedures):,}", border=True)
+    c3.metric("With evidence links", f"{linked:,}", border=True)
     st.caption("A scheduled job downloads MITOS again every Monday and replaces the catalogue "
                "when its content differs. The app always uses the latest; each refresh is "
                "tagged `catalogue-<date>` in the repository, so an older one can be checked "

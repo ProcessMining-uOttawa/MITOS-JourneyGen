@@ -66,7 +66,10 @@ them, and the words the tool uses.
   from the true episodes or from a method's journeys. It opens with the ten
   best trade-offs and then every recommendation, by numbered kind, each with
   its evidence, numbered effort and whether MITOS confirms it. Cells show
-  their whole content when pointed at; the thresholds can be adjusted.
+  their whole content when pointed at, the full list can be sorted and
+  filtered by kind, and the thresholds can be adjusted. Kinds of
+  recommendation, effort and life events each keep one colour throughout,
+  always beside their number or name.
   Below it, the candidate pairs, common sequences, repeated requests, and a
   journey-level log to open in PM4Py-UCM.
 - **Score a method.** Upload a `journeys.csv` (`case_id`, `journey_id`) to score
