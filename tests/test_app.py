@@ -45,6 +45,9 @@ def test_every_view_renders_before_a_log_exists():
 
 def test_the_start_page_leads_to_generate():
     at = start()
+    labels = {b.label for b in at.button}
+    for view in VIEWS[1:]:                 # every entry of the menu is introduced
+        assert any(l.startswith("Go to " + view.split()[0]) for l in labels), view
     button(at, "Go to Generate").click().run()
     assert not at.exception, at.exception
     assert at.session_state["view"] == "Generate"
@@ -135,6 +138,11 @@ def test_generate_inspect_and_score(fmt, log_file):
 
     go(at, "Bundles to integrate")
     assert any(m.label == "Journeys" for m in at.metric)
+    assert any(h.value == "Integration opportunities" for h in at.subheader)
+    tables = " ".join(h.body for h in at.get("html"))
+    assert "best trade-offs" in " ".join(m.value for m in at.markdown)
+    assert 'title="' in tables and "2. Offer as one step" in tables and "1 low" in tables
+    assert any(d.label == "Report (Markdown)" for d in at.get("download_button"))
     source = next(s for s in at.selectbox if s.label == "Journeys to use")
     assert "Hawkes, overlapping" in source.options
     source.set_value("Hawkes, overlapping").run()

@@ -358,6 +358,16 @@ def view_start() -> None:
                  "much unrelated use surrounds the life events.")
         st.button("Go to Population", on_click=goto, args=("Population",),
                   width="stretch")
+    st.subheader("And keep it current")
+    with st.container(border=True):
+        st.markdown("**Catalogue**")
+        st.write("The procedures come from a snapshot of MITOS, refreshed every week. See "
+                 "its date, what the last refresh changed and which life events that "
+                 "touches, or look up any procedure and its steps.")
+        st.button("Go to Catalogue", on_click=goto, args=("Catalogue",), width="stretch")
+    st.caption("That is every entry of the menu on the left: *Generate*, *Inspect*, *Score a "
+               "method* and *Bundles to integrate* are the four steps; *Scenarios*, "
+               "*Population* and *Catalogue* shape what they work on.")
     st.subheader("What is set up now")
     st.dataframe(pd.DataFrame([{
         "life event": s["label"], "happens to": who(s),
@@ -463,7 +473,7 @@ def view_scenarios() -> None:
                   on_click=delete_scenario, args=(at,))
     st.markdown(f"**Life events per citizen and year, by age group** {YOURS}")
     st.caption("0.05 means 5 of every 100 citizens of that age each year. Leave 0 for ages it "
-               "does not concern. For orientation: Greece has roughly 12 deaths and 7 births per "
+               "does not concern. For orientation: Greece has roughly 11 deaths and 7 births per "
                "1,000 inhabitants a year, but one death concerns several relatives.")
     cols = st.columns(len(cfg["population"]["age_groups"]))
     for col, age in zip(cols, cfg["population"]["age_groups"]):
@@ -1129,7 +1139,8 @@ def view_bundles() -> None:
 
     st.markdown(
         "This is the answer the whole exercise is for: **which services citizens use "
-        "together, in what order, and which would gain most from being integrated.** "
+        "together, in what order, and which would gain most from being integrated.** It "
+        "ends in recommendations you can hand on. "
         "It changes the level of the log. Until here a case was one service instance and an "
         "activity was a step. Here **a case is a journey and an activity is a service**.")
     inst = ss.result["inst"]
@@ -1171,11 +1182,109 @@ def view_bundles() -> None:
     cols[2].metric("Services", f"{log['concept:name'].nunique():,}")
     cols[3].metric("Kinds", f"{log['case:kind'].nunique():,}")
 
+    # ---- recommendations ----------------------------------------------------
+    st.subheader("Integration opportunities")
+    st.markdown(
+        "What an analyst could recommend, each with the evidence for it. A recommendation "
+        "needs four things: that the services really go together, **what kind** of relation "
+        "it is, what it costs citizens today, and how hard it would be.")
+    with st.expander("The kinds of recommendation, and how each is decided"):
+        meaning = {
+            "life event": "The services most journeys of a kind hold, behind one door.",
+            "one step": "Citizens always chain the two, in the same order. The second could "
+                        "start by itself when the first ends.",
+            "fetch": "The first is an input of the second: nearly every journey with the "
+                     "second has the first before it. The second could obtain it itself.",
+            "together": "Citizens need both, in either order.",
+            "reuse": "A result the citizen already has is requested again in the same "
+                     "journey.",
+            "start": "Citizens request the first almost only for the second, but only some "
+                     "need it: an occasional input.",
+        }
+        st.markdown("\n".join(f"- **{bd.TYPES[k]}.** {v}" for k, v in meaning.items()))
+        st.caption("The numbers order the kinds by how much each typically changes for "
+                   "citizens, 1 the most: a judgement, not a measurement. Effort is numbered "
+                   "the same way, from 1 low (one organisation) to 4 very high (across "
+                   "organisations, with a change of channel). The thresholds below are "
+                   "choices too; someone who knows the services should set them.")
+        c1, c2, c3 = st.columns(3)
+        share = c1.slider("Share that counts as \"nearly always\"", 0.4, 0.95, 0.6, 0.05,
+                          help="Of the journeys with one service, the share that must hold "
+                               "the other.")
+        need = c2.number_input("Journeys needed", 3, 500, 10,
+                               help="A pair seen in fewer journeys is left out.")
+        lift = c3.number_input("Lift needed", 1.0, 10.0, 1.2, 0.1,
+                               help="How much more than chance the two must go together.")
+    use_register = st.toggle(
+        "Say whether MITOS confirms each dependency", value=True,
+        help="Adds, for each pair, whether the register says the second procedure requires "
+             "the first, and lets that count in the score. The recommendations themselves "
+             "come from the log alone.")
+    opp = bd.opportunities(log, bd.requirements() if use_register else None, share=share,
+                           min_journeys=int(need), min_lift=float(lift))
+    best = bd.top(opp) if not opp.empty else opp
+    shown_cols = {"recommendation": "recommendation", "kind": "kind of journey",
+                  "what": "what to do", "journeys": "journeys",
+                  "requests_saved": "requests saved", "difficulty": "effort",
+                  "register": "register", "evidence": "evidence"}
+    if opp.empty:
+        st.info("No opportunity meets these thresholds. Lower them, or generate a larger log.")
+    else:
+        st.markdown(f"**The {len(best)} best trade-offs**")
+        st.caption("Ranked by a score from 0 to 100 that weighs how many journeys are "
+                   "concerned and what citizens would save against how sure the finding is "
+                   "and how much effort it takes. At most three per kind of journey and four "
+                   "of one kind of recommendation, so the list is not ten versions of one "
+                   "finding. Point at a cell to read all of it.")
+        hover_table(best, {"rank": "rank", "score": "score", **shown_cols},
+                    {"rank": 4, "score": 5, "recommendation": 13, "kind": 9, "what": 24,
+                     "journeys": 6, "requests_saved": 7, "difficulty": 12, "register": 8,
+                     "evidence": 12})
+        with st.expander("How the score is made"):
+            st.markdown(
+                "- **Benefit.** Half is reach: the journeys concerned, against the largest "
+                "in the table. 35% is the requests citizens would no longer make, 15% the "
+                "citizen-days between the two services today.\n"
+                "- **Certainty.** Full when MITOS confirms the dependency, 85% when the "
+                "register does not apply or was not consulted, 65% when the pair is not in "
+                "MITOS. For pairs it is also reduced when the lift is below 2.\n"
+                "- **Effort.** Full at level 1, then 85%, 70% and 55%.\n\n"
+                "The score is the three multiplied. The weights are choices: they make the "
+                "ranking reproducible and open to argument, not right.")
+        st.markdown("**All opportunities**")
+        counts = opp.recommendation.value_counts()
+        pick = st.multiselect("Show", list(bd.TYPES.values()),
+                              default=[t for t in bd.TYPES.values() if t in counts],
+                              format_func=lambda t: f"{t} ({counts.get(t, 0)})")
+        view = opp[opp.recommendation.isin(pick)].sort_values(
+            ["recommendation", "score"], ascending=[True, False])
+        hover_table(view.head(150), {"score": "score", **shown_cols},
+                    {"score": 5, "recommendation": 14, "kind": 9, "what": 25, "journeys": 6,
+                     "requests_saved": 7, "difficulty": 13, "register": 8, "evidence": 13})
+        if len(view) > 150:
+            st.caption(f"The first 150 of {len(view)}. The CSV has them all.")
+        if use_register and (opp.register == "not in MITOS").any():
+            st.caption("A pair marked *not in MITOS* goes together in the log although the "
+                       "register lists no requirement between the two. It may be a dependency "
+                       "nobody wrote down, or a coincidence: worth a look either way.")
+        ranked = opp.merge(best[["kind", "recommendation", "first", "then", "rank"]],
+                           how="left", on=["kind", "recommendation", "first", "then"]).rename(
+            columns={"rank": "top_rank"}).sort_values(
+            ["top_rank", "score"], ascending=[True, False], na_position="last")
+        c1, c2 = st.columns(2)
+        c1.download_button("Report (Markdown)", bd.report(opp, log, source).encode("utf-8"),
+                           file_name="integration_report.md", mime="text/markdown",
+                           type="primary", width="stretch",
+                           help="The best trade-offs and every recommendation written out, "
+                                "to hand on.")
+        c2.download_button("Opportunities (CSV)", ranked.to_csv(index=False).encode("utf-8"),
+                           file_name="integration_opportunities.csv", mime="text/csv",
+                           width="stretch")
+
     st.subheader("Pairs of services used together")
-    st.caption("Each row: citizens who use the first service go on to use the second, in the "
-               "same journey. Sorted by how many journeys do so. These are the candidates for "
-               "integration: one application instead of two, or the second service fetching "
-               "the first one's result by itself.")
+    st.caption("The raw material behind the recommendations. Each row: citizens who use the "
+               "first service go on to use the second, in the same journey. Sorted by how "
+               "many journeys do so.")
     cand = bd.candidates(log)
     only_cross = st.toggle("Only pairs that cross organisations",
                            help="Pairs inside one organisation are easier to integrate; pairs "
@@ -1228,12 +1337,20 @@ def view_bundles() -> None:
         "kind with a model family partitioned on it, or filter to one kind. Mining all kinds "
         "into one model gives a map too complicated to read.\n"
         "4. Raise the noise threshold above 0 if the map is cluttered: rare orders of "
-        "otherwise unordered services add many paths.")
+        "otherwise unordered services add many paths.\n"
+        "5. The ranking above travels with the log. Every journey carries "
+        "`top_opportunity` (the best-ranked opportunity it shows, or \"none\") and "
+        "`opportunity_rank`, so a model family partitioned on `top_opportunity` sets the "
+        "journeys that show an opportunity beside those that do not, and a filter keeps "
+        "only the ones behind recommendation 1. Each journey also carries `requests`, "
+        "`organisations` and `repeated_requests` as numbers, for dashboards. Each event "
+        "carries `avoidable_request` and `repeated_request` (yes or no).")
     c1, c2, c3 = st.columns(3)
-    c1.download_button("Journey log (XES, gzipped)", bd.to_xes(log),
+    tagged = bd.annotate(log, best) if not opp.empty else log
+    c1.download_button("Journey log (XES, gzipped)", bd.to_xes(tagged),
                        file_name="journey_log.xes.gz", mime="application/gzip", type="primary",
                        width="stretch")
-    c2.download_button("Journey log (CSV)", bd.to_csv(log), file_name="journey_log.csv",
+    c2.download_button("Journey log (CSV)", bd.to_csv(tagged), file_name="journey_log.csv",
                        mime="text/csv", width="stretch",
                        help="A CSV import reads one timestamp per row; use the XES to keep "
                             "both the start and the end.")
@@ -1260,6 +1377,36 @@ def kind_names(kinds: pd.DataFrame | None) -> dict:
         out[int(kind)] = f"Kind {int(kind)}: " + " + ".join(
             s if len(s) <= 42 else s[:40].rstrip() + "…" for s in top)
     return out
+
+
+def hover_table(df: pd.DataFrame, columns: dict, widths: dict) -> None:
+    """A table whose cells are cut to one line and show their whole content
+    when pointed at. ``columns`` maps a column to its heading, ``widths`` to
+    its share of the width."""
+    import html
+
+    total = sum(widths.values())
+    head = "".join(f'<th style="width:{100 * widths[c] / total:.1f}%" '
+                   f'title="{html.escape(h, quote=True)}">{html.escape(h)}</th>'
+                   for c, h in columns.items())
+    body = []
+    for row in df.itertuples(index=False):
+        cells = []
+        for c in columns:
+            value = getattr(row, c)
+            text = f"{value:,}" if isinstance(value, int) and not isinstance(
+                value, bool) and c not in ("rank", "score") else str(value)
+            cells.append(f'<td title="{html.escape(text, quote=True)}">{html.escape(text)}</td>')
+        body.append("<tr>" + "".join(cells) + "</tr>")
+    st.html(
+        '<style>.jg-table{width:100%;table-layout:fixed;border-collapse:collapse;'
+        'font-size:0.85rem}.jg-table th,.jg-table td{padding:5px 8px;text-align:left;'
+        'border-bottom:1px solid rgba(128,128,128,0.25);white-space:nowrap;overflow:hidden;'
+        'text-overflow:ellipsis}.jg-table th{font-weight:600;'
+        'border-bottom:1px solid rgba(128,128,128,0.6)}'
+        '.jg-table tr:hover td{background:rgba(128,128,128,0.10)}</style>'
+        f'<table class="jg-table"><thead><tr>{head}</tr></thead>'
+        f'<tbody>{"".join(body)}</tbody></table>')
 
 
 def journey_log_cached(source: str, min_size: int, n_members: int) -> pd.DataFrame:

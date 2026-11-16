@@ -11,6 +11,8 @@ out*/latent_kinds.csv
 # what bundles.py writes next to a log
 out*/journey_log.*
 out*/integration_candidates.csv
+out*/integration_opportunities.csv
+out*/integration_report.md
 out*/journey_variants.csv
 out*/repeated_requests.csv
 # other generated datasets; the default one in out/ is kept
