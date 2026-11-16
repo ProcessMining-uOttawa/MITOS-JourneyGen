@@ -1,5 +1,5 @@
 # for app.py; generate.py itself needs nothing
-streamlit>=1.44
+streamlit>=1.51
 pandas
 altair
 numpy
