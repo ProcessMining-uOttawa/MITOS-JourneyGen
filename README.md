@@ -14,7 +14,7 @@ too.
 
 ## Quick start
 
-Python 3.9 or later. The generator uses the standard library only; the methods
+Python 3.10 or later. The generator uses the standard library only; the methods
 in `prototype/` need `pip install -r prototype/requirements.txt`.
 
 ```bash
@@ -27,6 +27,64 @@ python generate.py --describe
 
 The first command writes the dataset. The second prints each scenario with the
 evidence MITOS attaches to its procedures, and generates nothing.
+
+`--format xes` writes the log as XES instead of CSV, and `--format both` writes
+the two; add `--gzip` for `events.xes.gz`. A trace is one service instance, and
+every event carries its completion in `time:timestamp` and its start in
+`start_timestamp`, the convention PM4Py reads as an interval log. The ground
+truth is CSV either way. A run of more than a few seconds reports its progress.
+
+## In the browser
+
+```bash
+pip install -r requirements.txt
+```
+
+```bash
+streamlit run app.py
+```
+
+The app does what the command line does, with nothing of its own added. It
+opens on a **Start here** page: three steps to a first result with the bundled
+scenarios, and the words the tool uses.
+
+- **Scenarios.** Each life event is first told as a story in sentences: who it
+  happens to, how often, which procedures it starts, how likely and when.
+  *Edit this scenario* opens four numbered steps: how often, which procedures
+  (added by searching the whole catalogue), the evidence the register
+  attaches, and a look at a procedure's steps. Every value is marked as coming
+  from MITOS or as your assumption.
+- **Population.** Age groups, regions, behaviour and background use.
+- **Generate.** Citizens, seed, rate multiplier, CSV or XES, language. An
+  estimate of the size and time comes first, from a short trial run. While it
+  runs the app shows citizens done, time elapsed and time left, running counts
+  and the stage it is in, and the run can be stopped. The result is one zip.
+- **Inspect.** Counts, episodes per scenario, how long episodes last, and one
+  citizen's instances on a time axis, coloured by true episode.
+- **Bundles to integrate.** Which services are used together and in what order,
+  from the true episodes or from a method's journeys: candidate pairs, common
+  sequences, repeated requests, and a journey-level log to open in PM4Py-UCM.
+- **Score a method.** Upload a `journeys.csv` (`case_id`, `journey_id`) to score
+  it against the ground truth and the fixed-gap baselines, or run a bundled
+  method: the three that read only the log, and the register alone. A switch
+  shows every method, an uploaded one included, with the register's links
+  added. The view says how many shared instances the log has and warns when
+  they are too few to judge *shared found*.
+- **Catalogue.** The date of the MITOS snapshot, what the last refresh changed,
+  and a refresh on demand.
+
+**Remarks on unrealistic values.** Where a value is set, and again before a
+run, the app points at values that are allowed but probably not meant: a life
+event frequent enough to happen twice to the same citizen, a procedure that
+waits for one listed after it and so never starts, an episode of a single
+instance, no reuse of certificates, no background use, a population too small
+to learn a bundle from. On the command line, `--describe` prints the same
+remarks, and a run says how many warnings there are. The bundled scenarios
+draw none.
+
+*Save project* writes the scenarios, population and generation settings to one
+file; *Load project* restores them. The app allows up to 20,000 citizens; set
+`MITOS_MAX_CITIZENS` to change that, or use the command line.
 
 With the defaults (2,000 citizens, seed 1) the log has 77,551 events in 10,568
 service instances of 55 services, used by 1,777 citizens (the others used no
@@ -141,20 +199,72 @@ allowance); set its chance under `evidence` to lower or remove it.
 `catalogue.json.gz` is a snapshot of all 4,416 published MITOS procedures,
 reduced to what the generator needs: titles, owner, life events, the two step
 trees (counter and digital) and the evidence links. Any of them can be used in
-a scenario. To refresh it:
+a scenario.
+
+### Keeping up with MITOS
+
+A scheduled job (`.github/workflows/refresh-catalogue.yml`) downloads all of
+MITOS again every Monday, compares the result with the catalogue in the
+repository and commits the new one only when its content differs. It writes
+what changed to `CATALOGUE_CHANGES.md` and `catalogue_changes.json`: new,
+withdrawn and changed procedures, and which bundled scenarios are affected.
+
+The comparison is on content, not dates. MITOS's own update dates and its
+change feed are dominated by automated bulk edits (every procedure showed an
+update within ten days when this was written), so they say little about
+whether a procedure really changed.
+
+The generator and the app always use the latest catalogue. A scenario that
+names a procedure MITOS has withdrawn is reported and must be fixed before a
+log can be generated. Each refresh is tagged `catalogue-<date>`; check that tag
+out to reproduce a dataset made with an earlier catalogue, whose date is in the
+dataset's `manifest.json`. The dataset in `out/` was made with the catalogue of
+2026-11-16.
+
+To refresh by hand:
 
 ```bash
 python build_catalogue.py --cache raw/
 ```
 
 This downloads about 5,000 small JSON documents from the public API and takes
-a quarter of an hour.
+a quarter of an hour; it reports the documents fetched and the time left as it
+goes. Give it an empty cache folder: the cache is for resuming an interrupted
+download, and documents already in it are taken as current.
+
+The app offers the same as *Refresh from MITOS now* in its Catalogue view, with
+a progress bar and a Stop button, when it runs on your own machine. A hosted
+app does not show it, since it cannot keep the file and every visitor could
+send MITOS 5,000 requests; set `MITOS_ALLOW_REFRESH=1` to show it anyway.
+
+To see what a new catalogue changes:
+
+```bash
+python catalogue_changes.py old.json.gz catalogue.json.gz
+```
 
 English labels come from MITOS where it publishes them (594 procedures, and
 any Greek step name that one of those translates). `translations_en.json`
 holds unofficial English renderings, written for this dataset, of the
 remaining titles and steps used by the bundled scenarios. A label with no
 English stays in Greek; `--describe` lists those.
+
+## Tests
+
+```bash
+python -m pytest tests -q
+```
+
+The tests drive the app without a browser: every view renders, the Start page
+leads to Generate, a scenario reads as a story until editing is switched on,
+remarks appear where values are set, a log is generated as CSV and as XES and
+then inspected and scored with and without the register, the app's log equals
+the command line's for the same seed, and a scenario naming a missing
+procedure is reported. The remarks themselves have their own tests, and one
+test regenerates `out/` from seed 1 and compares it byte for byte.
+
+The same tests run on GitHub for every pull request, on Linux and on Windows. The catalogue
+download and comparison are tested against a made-up MITOS, with no network.
 
 ## Limitations
 
@@ -174,6 +284,9 @@ English stays in Greek; `--describe` lists those.
 
 `prototype/` holds first methods for finding journeys, and their scorer. They
 need numpy, pandas and scipy, and write their results next to the log.
+[docs/methods.md](docs/methods.md) describes each one in full, what it is good
+and bad at, and compares them in one table; the app opens it from *Score a
+method*.
 
 ```bash
 python prototype/discover.py out/
@@ -275,6 +388,55 @@ logs, where not every requirement is exercised and not every dependency is
 written down. The default dataset has only 23 shared instances; with
 `--rate-scale 4` (918 of them) Hawkes + register finds 73%.
 
+## From journeys to an answer
+
+The question behind all this is: **which services do citizens use together, in
+what order, and which would gain most from being integrated?** Journeys, true
+or found by a method, are grouped instances. `bundles.py` turns them into that
+answer.
+
+```bash
+python bundles.py out/
+```
+
+```bash
+python bundles.py out/ --journeys out/journeys_hawkes.csv
+```
+
+The first uses the true episodes; the second, the journeys a method found,
+which is all there would be on real data. It changes the level of the log. In
+`events.csv` a case is a service instance and an activity is a step. In
+`journey_log` a **case is a journey and an activity is a service**, with the
+start and the end of each instance, the owning organisation as `org:role`, and
+the kind of life event as the case attribute `kind` when it is known.
+
+| File | Content |
+|---|---|
+| `journey_log.xes.gz`, `journey_log.csv` | The service-level log. |
+| `integration_candidates.csv` | Ordered pairs of services used in the same journey: how many journeys, how often the second follows the first, lift over the second one's popularity, the wait between them, and whether they belong to different organisations. |
+| `journey_variants.csv` | The most common whole sequences of services. |
+| `repeated_requests.csv` | Services requested more than once inside a journey. |
+
+On the default dataset, with the true episodes, the strongest candidates are
+*MyPhoto* then *Greek passport* (176 journeys, 3 days apart, two ministries)
+and *Declaration of a death* then *Death registration act* (152 journeys). The
+death registration act is requested again in 68% of the journeys that hold it:
+the duplication an integration would remove.
+
+### Opening it in PM4Py-UCM
+
+`journey_log.xes.gz` is an ordinary event log.
+[PM4Py-UCM](https://github.com/ProcessMining-uOttawa/pm4py-ucm) reads it as an
+interval log and mines a map of the services citizens chain together, with the
+organisations as components, so the points where a journey crosses from one
+body to another are visible. Mine one model per kind (a model family
+partitioned on the case attribute `kind`, or a filter); all kinds in one model
+is too much to read. Use the XES rather than the CSV to keep both timestamps.
+
+The app does the same in its **Bundles to integrate** view, for the true
+episodes or for any method run in *Score a method*, and offers the files as
+downloads.
+
 ## Open issues
 
 - **The subject of a journey.** Every episode has one applicant. In reality
@@ -296,4 +458,5 @@ the logs generated from it (including `out/`), since they reproduce MITOS's
 titles and step names. `translations_en.json` adds unofficial English
 renderings of MITOS text and is under CC BY-SA 4.0 as well.
 
-The code (`*.py`, `scenarios.json`) is under the MIT licence; see `LICENSE`.
+The code (`*.py`, `scenarios.json`, the workflow) is under the MIT licence; see
+`LICENSE`.

@@ -1,0 +1,6 @@
+# for app.py; generate.py itself needs nothing
+streamlit>=1.44
+pandas
+altair
+numpy
+scipy

@@ -11,6 +11,7 @@ The log itself says nothing about bundles. The ground truth is written to
 separate files, so a method that looks for bundles can be scored.
 
     python generate.py --citizens 2000 --seed 1 --out out/
+    python generate.py --format xes --gzip # an XES log instead of CSV
     python generate.py --describe          # show the scenarios, generate nothing
 
 Standard library only. See README.md.
@@ -27,6 +28,8 @@ import math
 import os
 import random
 import re
+import time
+from xml.sax.saxutils import quoteattr
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DAY = 86400.0
@@ -161,6 +164,7 @@ class Generator:
         self.b = cfg["behaviour"]
         self.instances: list = []
         self.episodes: list = []
+        self.n_events = 0
 
     # -- one service instance ------------------------------------------------
     def instance(self, citizen: dict, pid: str, t: dt.datetime, **truth) -> dict:
@@ -191,6 +195,7 @@ class Generator:
                 "channel": "digital" if digital else "counter", "shared": [],
                 "start": events[0][1], "end": events[-1][2], **truth}
         self.instances.append(inst)
+        self.n_events += len(events)
         if outcome == "completed":
             citizen["held"].append(inst)
         return inst
@@ -280,13 +285,22 @@ class Generator:
             self.episodes.append(ep)
 
     # -- the whole population ---------------------------------------------------
-    def run(self, n_citizens: int) -> None:
+    def run(self, n_citizens: int, progress=None) -> None:
+        """Simulate the population.
+
+        ``progress(done, total, instances, episodes, events)`` is called about
+        two hundred times along the way; it may raise to stop the run.
+        """
         rng, cfg = self.rng, self.cfg
+        every = max(1, n_citizens // 200)
         pop, win = cfg["population"], cfg["window"]
         t0 = dt.datetime.fromisoformat(win["start"])
         span = win["years"] * 365 * DAY
         ids = rng.sample(range(10 ** 7, 10 ** 8), n_citizens)
-        for cid in ids:
+        for done_count, cid in enumerate(ids):
+            if progress and done_count % every == 0:
+                progress(done_count, n_citizens, len(self.instances), len(self.episodes),
+                         self.n_events)
             age = weighted(rng, pop["age_groups"])
             citizen = {"id": f"C{cid}", "age": age, "region": weighted(rng, pop["regions"]),
                        "held": [],
@@ -311,15 +325,83 @@ class Generator:
         self.instances.sort(key=lambda i: (i["start"], i["citizen"]["id"]))
         for n, inst in enumerate(self.instances, 1):
             inst["case"] = f"S{n:07d}"
+        if progress:
+            progress(n_citizens, n_citizens, len(self.instances), len(self.episodes),
+                     self.n_events)
+
+    def write_xes(self, path: str, lang: str, compress: bool, progress=None) -> None:
+        """The log as XES: a trace per service instance, and on every event its
+        completion in ``time:timestamp`` and its start in ``start_timestamp``."""
+        cat = self.cat
+        both = lang == "both"
+        name = (lambda el: el or "") if lang == "el" else cat.en
+        stamp = lambda t: t.isoformat(timespec="seconds") + "+00:00"  # noqa: E731
+        attr = lambda kind, key, value: f'<{kind} key={quoteattr(key)} value={quoteattr(str(value))}/>'  # noqa: E731,E501
+        opener = gzip.open if compress else open
+        with opener(path, "wt", encoding="utf-8", newline="\n") as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n'
+                    '<log xes.version="1.0" xes.features="" '
+                    'xmlns="http://www.xes-standard.org/">\n'
+                    '<extension name="Concept" prefix="concept" '
+                    'uri="http://www.xes-standard.org/concept.xesext"/>\n'
+                    '<extension name="Time" prefix="time" '
+                    'uri="http://www.xes-standard.org/time.xesext"/>\n'
+                    '<extension name="Organizational" prefix="org" '
+                    'uri="http://www.xes-standard.org/org.xesext"/>\n'
+                    '<global scope="trace"><string key="concept:name" value=""/></global>\n'
+                    '<global scope="event"><string key="concept:name" value=""/>'
+                    '<date key="time:timestamp" value="1970-01-01T00:00:00+00:00"/>'
+                    '<date key="start_timestamp" value="1970-01-01T00:00:00+00:00"/>'
+                    '</global>\n'
+                    '<classifier name="Activity" keys="concept:name"/>\n')
+            total = len(self.instances)
+            every = max(1, total // 100)
+            for n, inst in enumerate(self.instances):
+                if progress and n % every == 0:
+                    progress(n / total)
+                p, c = cat.procedures[inst["pid"]], inst["citizen"]
+                org = (p["org"] if lang == "el" else p["org_en"] or p["org"]) or ""
+                out = ["<trace>", attr("string", "concept:name", inst["case"]),
+                       attr("string", "citizen_id", c["id"]),
+                       attr("string", "service_id", inst["pid"]),
+                       attr("string", "service",
+                            cat.title(inst["pid"], "el" if lang == "el" else "en")),
+                       attr("string", "channel", inst["channel"]),
+                       attr("string", "organisation", org),
+                       attr("string", "citizen_region", c["region"]),
+                       attr("string", "citizen_age_group", c["age"])]
+                if both:
+                    out.append(attr("string", "service_el", p["title"]))
+                for s, start, end in inst["events"]:
+                    out += ["<event>", attr("string", "concept:name", name(s["title"])),
+                            attr("date", "time:timestamp", stamp(end)),
+                            attr("date", "start_timestamp", stamp(start)),
+                            attr("string", "org:role", name(s["role"])),
+                            attr("string", "method", name(s["how"]))]
+                    if both:
+                        out.append(attr("string", "activity_el", s["title"]))
+                    out.append("</event>")
+                out.append("</trace>\n")
+                f.write("".join(out))
+            f.write("</log>\n")
 
     # -- output -------------------------------------------------------------------
-    def write(self, out: str, lang: str, args: dict) -> dict:
+    def write(self, out: str, lang: str, args: dict, fmt: str = "csv",
+              compress: bool = False, progress=None) -> dict:
+        """Write the log (``fmt``: csv, xes or both), the ground truth and the
+        manifest. ``progress(fraction)`` follows the writing of the log."""
         os.makedirs(out, exist_ok=True)
         cat, stamp = self.cat, lambda t: t.isoformat(sep=" ", timespec="seconds")
         both = lang == "both"
         name = (lambda el: el or "") if lang == "el" else cat.en
+        want_csv = fmt in ("csv", "both")
+        share = 0.5 if fmt == "both" else 1.0   # of the progress bar, for the CSV
+        report = (lambda x: progress(x * share)) if progress and want_csv else None
+        every = max(1, len(self.instances) // 50)
         rows = []
-        for inst in self.instances:
+        for n, inst in enumerate(self.instances if want_csv else ()):
+            if report and n % every == 0:
+                report(0.4 * n / len(self.instances))
             p, c = cat.procedures[inst["pid"]], inst["citizen"]
             org = (p["org"] if lang == "el" else p["org_en"] or p["org"]) or ""
             for s, start, end in inst["events"]:
@@ -337,13 +419,30 @@ class Generator:
         if both:
             header += ["service_el", "activity_el"]
 
-        def dump(fname, head, lines):
+        def dump(fname, head, lines, report=None, total=0):
             with open(os.path.join(out, fname), "w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f, lineterminator="\n")  # same bytes on every platform
                 w.writerow(head)
-                w.writerows(lines)
+                if not report:
+                    w.writerows(lines)
+                    return
+                for n, line in enumerate(lines):
+                    if n % 20000 == 0:
+                        report(0.4 + 0.6 * n / max(total, 1))
+                    w.writerow(line)
 
-        dump("events.csv", header, (r for _, r in rows))
+        log_files = []
+        if want_csv:
+            dump("events.csv", header, (r for _, r in rows), report, len(rows))
+            log_files.append("events.csv")
+        if progress:
+            progress(share if want_csv else 0.0)
+        if fmt in ("xes", "both"):
+            xes = "events.xes.gz" if compress else "events.xes"
+            lo = 0.5 if fmt == "both" else 0.0
+            self.write_xes(os.path.join(out, xes), lang, compress,
+                           (lambda x: progress(lo + (1 - lo) * x)) if progress else None)
+            log_files.append(xes)
         dump("truth_instances.csv",
              ["case_id", "citizen_id", "service_id", "service", "start", "end", "events",
               "channel", "outcome", "origin", "episode_id", "scenario", "role", "attempt",
@@ -385,8 +484,9 @@ class Generator:
             outcomes[i["outcome"]] = outcomes.get(i["outcome"], 0) + 1
         manifest = {
             "generator": "MITOS-JourneyGen generate.py", "arguments": args,
+            "log_files": log_files,
             "catalogue": cat.meta, "citizens": len({i["citizen"]["id"] for i in self.instances}),
-            "instances": len(self.instances), "events": len(rows),
+            "instances": len(self.instances), "events": self.n_events,
             "services": len(used), "episodes": len(self.episodes),
             "episodes_by_scenario": {s["id"]: sum(1 for e in self.episodes
                                                   if e["scenario"] == s["id"])
@@ -403,6 +503,199 @@ class Generator:
         with open(os.path.join(out, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=1)
         return manifest
+
+
+def check(cat: Catalogue, cfg: dict) -> list:
+    """Problems that would stop or distort a run, as sentences. A scenario
+    written against an older catalogue can name a procedure that MITOS has
+    since withdrawn or emptied."""
+    out = []
+
+    def usable(pid):
+        p = cat.procedures.get(pid)
+        if p is None:
+            return "is not in the catalogue"
+        if not (p["steps"] or p["digital_steps"]):
+            return "has no steps in the catalogue"
+        return None
+
+    for scen in cfg["scenarios"]:
+        ids = [item["id"] for item in scen["procedures"]]
+        for item in scen["procedures"]:
+            why = usable(item["id"])
+            if why:
+                out.append(f"Scenario '{scen['label']}': procedure {item['id']} {why}.")
+            for a in item.get("after", []):
+                if a not in ids:
+                    out.append(f"Scenario '{scen['label']}': procedure {item['id']} waits for "
+                               f"{a}, which the scenario does not list.")
+    for pid in cfg["background"]["services"]:
+        why = usable(pid)
+        if why:
+            out.append(f"Background service {pid} {why}.")
+    if cfg["background"]["rate_per_year"] > 0 and not cfg["background"]["services"]:
+        out.append("Background use has a rate but no service to draw from.")
+    if sum(cfg["population"]["age_groups"].values()) <= 0:
+        out.append("Every age group has a share of zero, so there are no citizens.")
+    if not cfg["population"]["regions"]:
+        out.append("The population has no region.")
+    return out
+
+
+def review(cat: Catalogue, cfg: dict, n_citizens: int | None = None,
+           rate_scale: float = 1.0) -> list:
+    """Values that are allowed but probably not meant, or not realistic.
+
+    Returns dicts with ``where`` ("scenario:<position>", "population",
+    "behaviour", "background" or "run"), ``level`` ("warning" for something
+    that distorts the log, "note" for something to be aware of) and ``text``.
+    Nothing here stops a run; :func:`check` does that.
+    """
+    out = []
+
+    def say(where, level, text):
+        out.append({"where": where, "level": level, "text": text})
+
+    pop, b, bg = cfg["population"], cfg["behaviour"], cfg["background"]
+    years = cfg["window"]["years"]
+    total = sum(pop["age_groups"].values()) or 1.0
+    share = {a: v / total for a, v in pop["age_groups"].items()}
+
+    for pos, scen in enumerate(cfg["scenarios"]):
+        where = f"scenario:{pos}"
+        rates = {a: r * rate_scale for a, r in scen["rate_per_year"].items()
+                 if r > 0 and share.get(a, 0) > 0}
+        if not rates:
+            say(where, "warning", "This life event never happens: its rate is zero for every "
+                "age group that has citizens.")
+        else:
+            age, top = max(rates.items(), key=lambda kv: kv[1])
+            if top > 0.5:
+                say(where, "warning", f"Citizens aged {age} go through this {top:.2f} times a "
+                    "year on average. Few life events are that frequent.")
+            lam = top * years
+            twice = 1 - math.exp(-lam) * (1 + lam)
+            if twice > 0.05:
+                say(where, "warning", f"About {twice:.0%} of citizens aged {age} will go "
+                    f"through this twice or more in the {years}-year window. For an event "
+                    "such as a death in the family or a retirement that is not plausible: "
+                    "lower the rate or shorten the window.")
+            if n_citizens:
+                expected = n_citizens * sum(share[a] * r * years for a, r in rates.items())
+                if expected < 30:
+                    say(where, "note", f"Only about {expected:.0f} episodes are expected with "
+                        f"{n_citizens:,} citizens. That is too few for a method to learn this "
+                        "bundle's timing: use more citizens.")
+        items = scen["procedures"]
+        ids = [x["id"] for x in items]
+        if not items:
+            say(where, "warning", "This life event starts no procedure, so it leaves no trace "
+                "in the log.")
+            continue
+        effective: dict = {}
+        for n, item in enumerate(items):
+            name = cat.title(item["id"]) if item["id"] in cat.procedures else item["id"]
+            chance = item["p"]
+            for a in item.get("after", []):
+                if a in ids and ids.index(a) > n:
+                    say(where, "warning", f"'{name}' waits for {a}, which is listed after it. "
+                        "Procedures are taken in the order listed, so it never starts. Move "
+                        "it below the one it waits for.")
+                    chance = 0.0
+                chance *= effective.get(a, 0.0 if a in ids else 1.0)
+            effective[item["id"]] = chance
+            if item["p"] <= 0:
+                say(where, "warning", f"'{name}' has a chance of 0, so it never starts.")
+            elif 0 < chance < 0.02:
+                say(where, "note", f"'{name}' starts in only about {chance:.1%} of episodes, "
+                    "once the chances of what it waits for are counted.")
+            hi = item["delay_days"][1]
+            if hi > years * 365:
+                say(where, "warning", f"'{name}' can wait {hi:.0f} days, longer than the "
+                    f"{years}-year window. Much of it will fall long after everything else.")
+        # what an episode holds on average: its procedures and their evidence
+        size = 0.0
+        over = scen.get("evidence", {})
+        for item in items:
+            evidence = 0.0
+            for r in cat.procedures.get(item["id"], {}).get("requires", []):
+                q = cat.procedures.get(r["id"])
+                if q and (q["steps"] or q["digital_steps"]):
+                    evidence += over.get(r["id"], b["alternative_evidence_probability"]
+                                         if r["alternative"] else b["evidence_probability"])
+            size += effective[item["id"]] * (1 + evidence)
+        if size < 1.5:
+            say(where, "warning", f"An episode holds {size:.1f} instances on average, evidence "
+                "included. Many episodes will be a single instance, which leaves nothing to "
+                "find. Raise some chances or add procedures.")
+
+    if all(v >= 0.95 for v in pop["digital_propensity"].values()) or all(
+            v <= 0.05 for v in pop["digital_propensity"].values()):
+        say("population", "note", "Nearly everyone uses the same channel, so the log shows "
+            "only one of the two step trees of each procedure.")
+
+    if b["evidence_probability"] <= 0 and b["alternative_evidence_probability"] <= 0:
+        say("behaviour", "warning", "No evidence is ever requested. Bundles shrink to the "
+            "procedures a scenario lists, and the register's links leave no trace.")
+    if b["reuse_evidence_probability"] <= 0:
+        say("behaviour", "warning", "No result is ever reused, so no instance is shared "
+            "between episodes and nothing can be learnt about finding shared instances.")
+    elif b["reuse_evidence_probability"] >= 1:
+        say("behaviour", "note", "A valid result is always reused. Real citizens often request "
+            "a certificate again, which is the duplication integration would remove.")
+    if b["abandon_probability"] > 0.25:
+        say("behaviour", "warning", f"{b['abandon_probability']:.0%} of instances are abandoned "
+            "part-way. That is a very unreliable service landscape.")
+    if b["negative_branch_weight"] > 0.5:
+        say("behaviour", "warning", "A failure branch is almost as likely as a normal one, so "
+            "most instances of a branching procedure fail.")
+    if b["max_attempts"] <= 1 or b["retry_probability"] < 0.1:
+        say("behaviour", "note", "Citizens hardly ever retry after a failure, so a failed "
+            "procedure usually ends the part of the episode that depends on it.")
+    if not 7 <= b["evidence_validity_days"] <= 730:
+        say("behaviour", "note", f"A result is valid for {b['evidence_validity_days']:.0f} days "
+            "where MITOS gives no validity. Certificates are usually valid for one to six "
+            "months.")
+
+    if bg["rate_per_year"] <= 0:
+        say("background", "warning", "There is no background use: every instance belongs to an "
+            "episode. Real logs are mostly unrelated use, so this is a far easier problem.")
+    elif bg["rate_per_year"] > 12:
+        say("background", "warning", f"A citizen makes {bg['rate_per_year']:.0f} unrelated uses "
+            "a year, more than one a month. Bundles will be hard to see under that.")
+
+    if rate_scale > 1:
+        say("run", "note" if rate_scale <= 3 else "warning",
+            f"Life-event rates are multiplied by {rate_scale:g}. That is a stress test: "
+            "citizens' lives are busier than real ones.")
+    if n_citizens is not None and n_citizens < 500:
+        say("run", "note", f"{n_citizens:,} citizens give a small log. It is fine for a first "
+            "look, too small to compare methods.")
+    return out
+
+
+def estimate(cat: Catalogue, cfg: dict, n_citizens: int, rate_scale: float = 1.0,
+             sample: int = 400) -> dict:
+    """Roughly what a run will produce and how long it will take, from a small
+    trial run on this machine."""
+    trial = Generator(cat, cfg, 12345, rate_scale)
+    began = time.perf_counter()
+    trial.run(sample)
+    took = time.perf_counter() - began
+    scale = n_citizens / sample
+    events = trial.n_events * scale
+    background = sum(1 for i in trial.instances if i["origin"] == "background")
+    shared = sum(1 for i in trial.instances
+                 if len(i["shared"]) + bool(i["episode"]) > 1 or (i["shared"]
+                                                                   and not i["episode"]))
+    return {"instances": int(len(trial.instances) * scale), "events": int(events),
+            "episodes": int(len(trial.episodes) * scale),
+            "background_instances": int(background * scale),
+            "shared_instances": int(shared * scale),
+            # simulating is about half of a run; sorting and writing are the rest
+            "seconds": took * scale * 2.2,
+            "csv_mb": events * 240 / 1e6, "xes_mb": events * 375 / 1e6,
+            "xes_gz_mb": events * 28 / 1e6}
 
 
 def describe(cat: Catalogue, cfg: dict) -> None:
@@ -428,6 +721,13 @@ def describe(cat: Catalogue, cfg: dict) -> None:
     print(f"\n{len(cat.untranslated)} labels have no English and stay in Greek:")
     for text in sorted(cat.untranslated):
         print("  ", text)
+    remarks = review(cat, cfg)
+    print(f"\n{len(remarks)} remarks on the values chosen:")
+    for r in remarks:
+        where = r["where"]
+        if where.startswith("scenario:"):
+            where = cfg["scenarios"][int(where.split(":")[1])]["label"]
+        print(f"   [{r['level']}] {where}: {r['text']}")
 
 
 def main() -> None:
@@ -438,6 +738,9 @@ def main() -> None:
     ap.add_argument("--lang", choices=("en", "el", "both"), default="en",
                     help="labels in English (Greek where MITOS has no English), "
                          "Greek, or English plus Greek columns")
+    ap.add_argument("--format", choices=("csv", "xes", "both"), default="csv",
+                    help="the log as CSV, as XES (start in start_timestamp), or both")
+    ap.add_argument("--gzip", action="store_true", help="write the XES log gzipped")
     ap.add_argument("--rate-scale", type=float, default=1.0,
                     help="multiply every life-event rate, to make episodes of one "
                          "citizen overlap more often (a stress test)")
@@ -458,12 +761,29 @@ def main() -> None:
     if args.describe:
         describe(cat, cfg)
         return
+    problems = check(cat, cfg)
+    if problems:
+        raise SystemExit("Cannot generate:\n  " + "\n  ".join(problems))
+    warnings = [r for r in review(cat, cfg, args.citizens, args.rate_scale)
+                if r["level"] == "warning"]
+    if warnings:
+        print(f"{len(warnings)} values look unrealistic; run with --describe to see them.")
     gen = Generator(cat, cfg, args.seed, args.rate_scale)
-    gen.run(args.citizens)
+    began, shown = time.perf_counter(), [0.0]
+
+    def progress(done, total, instances, episodes, events):
+        now = time.perf_counter() - began
+        if now - shown[0] >= 5 and done < total:  # only a long run reports
+            shown[0] = now
+            left = now * (total - done) / max(done, 1)
+            print(f"  {done:,} of {total:,} citizens, {events:,} events, "
+                  f"about {left:.0f} s of simulation left", flush=True)
+
+    gen.run(args.citizens, progress)
     manifest = gen.write(args.out, args.lang, {
         "citizens": args.citizens, "seed": args.seed, "lang": args.lang,
-        "rate_scale": args.rate_scale,
-        "scenarios": os.path.basename(args.scenarios)})
+        "rate_scale": args.rate_scale, "format": args.format,
+        "scenarios": os.path.basename(args.scenarios)}, args.format, args.gzip)
     print(json.dumps({k: v for k, v in manifest.items() if k not in ("arguments", "catalogue")},
                      indent=1))
     print("written to", args.out)

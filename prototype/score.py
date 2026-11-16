@@ -79,17 +79,22 @@ def fixed_gap(inst: pd.DataFrame, days: float) -> pd.DataFrame:
                          "journey_id": (gap.isna() | (gap > days)).cumsum().to_numpy()})
 
 
-def load_truth(folder: str):
-    inst = pd.read_csv(os.path.join(folder, "truth_instances.csv"),
-                       parse_dates=["start", "end"], dtype=str).fillna("")
-    inst["start"], inst["end"] = pd.to_datetime(inst.start), pd.to_datetime(inst.end)
+def truth_groups(inst: pd.DataFrame):
+    """(case_id, episode) memberships and the set of truly shared instances,
+    from the rows of ``truth_instances.csv``."""
     eps = (inst.episode_id + ";" + inst.shared_with).str.strip(";").str.split(";")
-    truth = pd.DataFrame({"case_id": inst.case_id, "episode": eps,
-                          "scenario": inst.scenario}).explode("episode")
+    truth = pd.DataFrame({"case_id": inst.case_id, "episode": eps}).explode("episode")
     truth = truth[truth.episode != ""]
     n = truth.groupby("case_id").episode.nunique()
     shared = set(n.index[n > 1]) | set(inst.case_id[(inst.episode_id == "")
                                                      & (inst.shared_with != "")])
+    return truth, shared
+
+
+def load_truth(folder: str):
+    inst = pd.read_csv(os.path.join(folder, "truth_instances.csv"), dtype=str).fillna("")
+    inst["start"], inst["end"] = pd.to_datetime(inst.start), pd.to_datetime(inst.end)
+    truth, shared = truth_groups(inst)
     return inst, truth, shared
 
 

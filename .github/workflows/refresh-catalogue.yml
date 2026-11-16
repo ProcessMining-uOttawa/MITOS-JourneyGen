@@ -1,0 +1,62 @@
+name: Refresh MITOS catalogue
+
+# Every Monday: download all of MITOS again, compare with the catalogue in the
+# repository, and commit the new one only when its content differs. Each
+# refresh is tagged, so an older catalogue stays available.
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-catalogue
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Keep the current catalogue for comparison
+        run: cp catalogue.json.gz "$RUNNER_TEMP/old.json.gz"
+
+      - name: Download MITOS and rebuild the catalogue
+        # Fails, and so commits nothing, if any procedure could not be fetched.
+        run: python build_catalogue.py --cache "$RUNNER_TEMP/raw"
+
+      - name: Compare
+        id: diff
+        run: python catalogue_changes.py "$RUNNER_TEMP/old.json.gz" catalogue.json.gz
+
+      - name: Check that the bundled scenarios still generate
+        if: steps.diff.outputs.changed == 'true'
+        continue-on-error: true
+        run: python generate.py --citizens 200 --out "$RUNNER_TEMP/smoke"
+
+      - name: Commit and tag
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          SUMMARY: ${{ steps.diff.outputs.summary }}
+          DATE: ${{ steps.diff.outputs.date }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalogue.json.gz catalogue_changes.json CATALOGUE_CHANGES.md
+          git commit -m "Catalogue refresh $DATE: $SUMMARY"
+          git tag -f "catalogue-$DATE"
+          git push origin HEAD
+          git push -f origin "catalogue-$DATE"
+
+      - name: Nothing changed
+        if: steps.diff.outputs.changed != 'true'
+        run: echo "MITOS content is unchanged; the catalogue in the repository stays."
