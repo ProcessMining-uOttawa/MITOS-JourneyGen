@@ -1,0 +1,56 @@
+name: Release
+
+# When a release is published, move the `release` branch to it. The deployed
+# app watches that branch, so it updates with every release and with nothing
+# else: work merged into main stays out of sight until it is released.
+#
+# Nobody commits to `release` by hand. Besides this job, only the weekly
+# catalogue refresh writes to it, to carry a new catalogue to the deployed app.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to deploy, for example v0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-branch
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: The tag is the version the code states
+        run: |
+          VERSION=$(python generate.py --version)
+          if [ "v$VERSION" != "$TAG" ]; then
+            echo "The tag is $TAG but generate.py says $VERSION. Nothing was deployed."
+            exit 1
+          fi
+
+      - name: The released code generates a log
+        run: python generate.py --citizens 200 --seed 1 --out "$RUNNER_TEMP/smoke"
+
+      - name: Move the release branch to the tag
+        run: |
+          git push --force origin "HEAD:refs/heads/release"
+          echo "The release branch is now at $TAG ($(git rev-parse --short HEAD))."

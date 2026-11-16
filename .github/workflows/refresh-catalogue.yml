@@ -2,7 +2,8 @@ name: Refresh MITOS catalogue
 
 # Every Monday: download all of MITOS again, compare with the catalogue in the
 # repository, and commit the new one only when its content differs. Each
-# refresh is tagged, so an older catalogue stays available.
+# refresh is tagged, so an older catalogue stays available. The new catalogue
+# also goes to the release branch, which the deployed app watches.
 
 on:
   schedule:
@@ -56,6 +57,29 @@ jobs:
           git tag -f "catalogue-$DATE"
           git push origin HEAD
           git push -f origin "catalogue-$DATE"
+
+      - name: Carry the catalogue to the deployed app
+        # The deployed app watches the release branch, which otherwise moves
+        # only with a release. It should still follow the latest catalogue.
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          SUMMARY: ${{ steps.diff.outputs.summary }}
+          DATE: ${{ steps.diff.outputs.date }}
+        run: |
+          if ! git ls-remote --exit-code --heads origin release > /dev/null; then
+            echo "There is no release branch yet; nothing is deployed."
+            exit 0
+          fi
+          REFRESHED=$(git rev-parse HEAD)
+          git fetch origin release
+          git checkout -B release FETCH_HEAD
+          git checkout "$REFRESHED" -- catalogue.json.gz catalogue_changes.json CATALOGUE_CHANGES.md
+          if git diff --cached --quiet; then
+            echo "The release branch already has this catalogue."
+          else
+            git commit -m "Catalogue refresh $DATE: $SUMMARY"
+            git push origin release
+          fi
 
       - name: Nothing changed
         if: steps.diff.outputs.changed != 'true'

@@ -1,5 +1,6 @@
 {
  "generator": "MITOS-JourneyGen generate.py",
+ "version": "0.1.0",
  "arguments": {
   "citizens": 2000,
   "seed": 1,
