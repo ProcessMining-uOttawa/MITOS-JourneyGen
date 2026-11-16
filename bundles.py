@@ -46,7 +46,8 @@ def journey_log(inst: pd.DataFrame, members: pd.DataFrame, organisation: dict | 
     """One row per service instance per journey, in PM4Py's column names.
 
     ``inst`` has ``case_id, citizen_id, service_id, service, start, end`` and
-    optionally ``channel``. ``members`` has ``case_id, journey_id`` and
+    optionally ``channel`` and ``outcome`` (``completed`` or not: the status a
+    real system records for each request). ``members`` has ``case_id, journey_id`` and
     optionally ``kind`` (the kind of life event, when it is known). Journeys
     of fewer than ``min_size`` instances are left out: a single instance is
     not a bundle.
@@ -54,8 +55,8 @@ def journey_log(inst: pd.DataFrame, members: pd.DataFrame, organisation: dict | 
     m = members.astype({"case_id": str}).drop_duplicates(["case_id", "journey_id"])
     size = m.groupby("journey_id").case_id.transform("size")
     m = m[size >= min_size]
-    cols = ["case_id", "citizen_id", "service_id", "service", "start", "end"] + (
-        ["channel"] if "channel" in inst.columns else [])
+    cols = ["case_id", "citizen_id", "service_id", "service", "start", "end"] + [
+        c for c in ("channel", "outcome") if c in inst.columns]
     df = m.merge(inst[cols].astype({"case_id": str}), on="case_id")
     df["start"], df["end"] = pd.to_datetime(df.start), pd.to_datetime(df.end)
     # journey ids as short names, numbered by when the journey begins
@@ -72,8 +73,9 @@ def journey_log(inst: pd.DataFrame, members: pd.DataFrame, organisation: dict | 
         "case:citizen_id": df.citizen_id,
         "case:kind": df.kind.astype(str) if "kind" in df.columns else "journey",
     })
-    if "channel" in df.columns:
-        out["channel"] = df.channel
+    for extra in ("channel", "outcome"):
+        if extra in df.columns:
+            out[extra] = df[extra]
     return out.sort_values(["case:concept:name", "start_timestamp", "time:timestamp"],
                            kind="stable").reset_index(drop=True)
 
@@ -181,7 +183,9 @@ def pair_evidence(log: pd.DataFrame) -> pd.DataFrame:
     first B), ``next_to`` (journeys where B is the next service after A),
     the wait from the end of the first A to the start of the first B, their
     organisations and channels, and ``lift`` over all journeys of every kind.
-    One row per ordered pair that occurs.
+    One row per ordered pair that occurs. When the log carries the outcome of
+    each request, ``requests`` counts the requests for the two services in the
+    journeys where A comes first, and ``failed`` those that did not complete.
     """
     firsts = log.sort_values(["case:concept:name", "start_timestamp"], kind="stable").groupby(
         ["case:kind", "case:concept:name", "concept:name"], sort=False).agg(
@@ -219,12 +223,25 @@ def pair_evidence(log: pd.DataFrame) -> pd.DataFrame:
     out["next_to"] = [int(adjacent.get(x, 0)) for x in key_ab]
     out["lift"] = [follows_all[(a, b)] / has_all[a] / (has_all[b] / journeys_all)
                    for _, a, b in key_ab]
+    # requests for the two services in the journeys that hold A before B, and
+    # how many of them failed or were abandoned
+    out["requests"] = out["failed"] = 0
+    if "outcome" in log.columns:
+        n = log.assign(bad=(log.outcome != "completed").astype(int)).groupby(
+            ["case:concept:name", "concept:name"]).agg(n=("bad", "size"), bad=("bad", "sum"))
+        ka, kb = list(zip(p.journey, p.service_a)), list(zip(p.journey, p.service_b))
+        counts = p[["kind", "service_a", "service_b"]].assign(
+            requests=n.n.reindex(ka).to_numpy() + n.n.reindex(kb).to_numpy(),
+            failed=n.bad.reindex(ka).to_numpy() + n.bad.reindex(kb).to_numpy()).groupby(
+            ["kind", "service_a", "service_b"])[["requests", "failed"]].sum()
+        out["requests"] = [int(counts.requests[k]) for k in key_ab]
+        out["failed"] = [int(counts.failed[k]) for k in key_ab]
     return out
 
 
 def opportunities(log: pd.DataFrame, requires: dict | None = None, share: float = 0.6,
-                  ordered: float = 0.9, min_journeys: int = 10, min_lift: float = 1.2,
-                  direct: float = 0.25) -> pd.DataFrame:
+                  ordered: float = 0.9, min_journeys: int = 10, min_lift: float = 1.5,
+                  direct: float = 0.25, kind_share: float = 0.1) -> pd.DataFrame:
     """What could be integrated, read off a journey log.
 
     Each row is one recommendation with the evidence for it. The kinds of
@@ -249,10 +266,16 @@ def opportunities(log: pd.DataFrame, requires: dict | None = None, share: float 
       (A log cannot tell this from B being a consequence of A; where B always
       follows and always has A before it, the pair is "one step".)
 
-    Pairs need ``min_journeys`` journeys and a ``lift`` of ``min_lift``. For
-    the ordered kinds, B must be the next service after A in at least
-    ``direct`` of the journeys, which leaves out pairs that only go together
-    through a third service. ``requires`` maps a service id to the ids MITOS
+    Pairs need ``min_journeys`` journeys, at least ``kind_share`` of the
+    journeys of their kind, and a ``lift`` of ``min_lift``. For the ordered
+    kinds, B must be the next service after A in at least ``direct`` of the
+    journeys, which leaves out pairs that only go together through a third
+    service. An unordered pair is left out when both services are already
+    part of the entry point for the life event: the entry point says it once,
+    where the pairs would say it once for every two of its services.
+
+    With the outcome of each request in the log, every recommendation also
+    counts the requests concerned that failed or were abandoned. ``requires`` maps a service id to the ids MITOS
     says it requires; with it, each pair says whether the register confirms
     the dependency.
 
@@ -262,6 +285,32 @@ def opportunities(log: pd.DataFrame, requires: dict | None = None, share: float 
     """
     ev = pair_evidence(log)
     rows = []
+    has_outcome = "outcome" in log.columns
+    counts = {(r.kind, r.service_a, r.service_b): (r.requests, r.failed)
+              for r in ev.itertuples(index=False)}
+    by_service = log.assign(bad=(log.outcome != "completed").astype(int)).groupby(
+        ["case:kind", "concept:name"]).agg(n=("bad", "size"), bad=("bad", "sum")
+                                           ) if has_outcome else None
+
+    def failures(requests: int, failed: int) -> dict:
+        return {"failed_requests": int(failed),
+                "failure_rate": round(failed / requests, 3) if requests else float("nan")}
+
+    def failure_text(requests: int, failed: int) -> str:
+        if not has_outcome or not requests:
+            return ""
+        return (f" Of the {requests:,} requests concerned, {failed:,} failed or were "
+                f"abandoned ({failed / requests:.0%}).")
+
+    # the services at the heart of each kind of journey: its entry point
+    per_journey = log.drop_duplicates(["case:concept:name", "concept:name"])
+    in_kind = per_journey.groupby("case:kind")["case:concept:name"].nunique()
+    core_of = {}
+    for kind, grp in per_journey.groupby("case:kind"):
+        share_of = grp.groupby("concept:name").size() / in_kind[kind]
+        core = share_of[share_of >= 0.5]
+        core_of[kind] = set(core.index) if len(core) >= 2 and in_kind[
+            kind] >= min_journeys else set()
 
     def pair_effort(a, b, breaks):
         across = bool(a and b and a != b)
@@ -277,7 +326,8 @@ def opportunities(log: pd.DataFrame, requires: dict | None = None, share: float 
 
     seen = set()
     for r in ev.itertuples(index=False):
-        if r.both < min_journeys or r.lift < min_lift:
+        if (r.both < min_journeys or r.lift < min_lift
+                or r.both < kind_share * in_kind[r.kind]):
             continue
         a_before = r.a_first / r.both
         follows, preceded = r.a_first / r.with_a, r.a_first / r.with_b
@@ -294,6 +344,8 @@ def opportunities(log: pd.DataFrame, requires: dict | None = None, share: float 
         elif r.both / min(r.with_a, r.with_b) >= share and (1 - ordered) < a_before:
             if (r.kind, r.service_b, r.service_a) in seen:
                 continue            # an unordered pair is reported once
+            if {r.service_a, r.service_b} <= core_of[r.kind]:
+                continue            # the entry point of the life event covers it
             kind = "together"
         if kind is None:
             continue
@@ -314,6 +366,11 @@ def opportunities(log: pd.DataFrame, requires: dict | None = None, share: float 
                     f"'{a}'; '{a}' came before in {preceded:.0%} of the journeys with '{b}'. "
                     f"Median wait between them: {r.median_wait_days:.1f} days.")
         level, where = pair_effort(r.org_a, r.org_b, r.channel_breaks)
+        requests, failed = r.requests, r.failed
+        if kind == "together":      # either order counts
+            back = counts.get((r.kind, r.service_b, r.service_a), (0, 0))
+            requests, failed = requests + back[0], failed + back[1]
+        evidence += failure_text(requests, failed)
         if kind == "together" and requires is not None:
             known = "confirmed" in register(r.sid_a, r.sid_b) + register(r.sid_b, r.sid_a)
             reg = "confirmed by MITOS" if known else "not in MITOS"
@@ -326,7 +383,8 @@ def opportunities(log: pd.DataFrame, requires: dict | None = None, share: float 
             "citizen_days_between": round(float(r.citizen_days)),
             "median_wait_days": round(float(r.median_wait_days), 1),
             "lift": round(float(r.lift), 1), "effort_level": level,
-            "difficulty": f"{EFFORT[level]}: {where}", "register": reg, "evidence": evidence})
+            "difficulty": f"{EFFORT[level]}: {where}", "register": reg, "evidence": evidence,
+            **failures(requests, failed)})
 
     again = repeated(log, min_journeys=max(3, min_journeys // 2))
     for r in again[again.share_repeating >= 0.2].itertuples(index=False):
@@ -341,9 +399,12 @@ def opportunities(log: pd.DataFrame, requires: dict | None = None, share: float 
             "register": "not checked" if requires is None else "does not apply",
             "evidence": f"Requested more than once in {r.journeys_repeating_it:,} of "
                         f"{r.journeys_with_it:,} journeys that hold it "
-                        f"({r.share_repeating:.0%}): {r.extra_requests:,} extra requests."})
+                        f"({r.share_repeating:.0%}): {r.extra_requests:,} extra requests."
+                        + (failure_text(*by_service.loc[(r.kind, r.service)])
+                           if has_outcome else ""),
+            **(failures(*by_service.loc[(r.kind, r.service)]) if has_outcome
+               else failures(0, 0))})
 
-    per_journey = log.drop_duplicates(["case:concept:name", "concept:name"])
     spans = log.groupby("case:concept:name").agg(a=("start_timestamp", "min"),
                                                  b=("time:timestamp", "max"),
                                                  n=("concept:name", "size"))
@@ -377,10 +438,14 @@ def opportunities(log: pd.DataFrame, requires: dict | None = None, share: float 
             "evidence": f"{total:,} journeys; each of these services is in at least half of "
                         f"them ({', '.join(f'{v:.0%}' for v in core)}). A journey takes a "
                         f"median {mine.days.median():.0f} days and "
-                        f"{mine.n.median():.0f} requests."})
+                        f"{mine.n.median():.0f} requests."
+                        + (failure_text(*by_service.loc[kind].loc[list(core.index)].sum())
+                           if has_outcome else ""),
+            **(failures(*by_service.loc[kind].loc[list(core.index)].sum()) if has_outcome
+               else failures(0, 0))})
     cols = ["kind", "recommendation", "what", "first", "then", "journeys", "requests_saved",
             "citizen_days_between", "median_wait_days", "lift", "effort_level", "difficulty",
-            "register", "evidence"]
+            "register", "evidence", "failed_requests", "failure_rate"]
     out = scored(pd.DataFrame(rows, columns=cols))
     return out.sort_values(["recommendation", "journeys"], ascending=[True, False]
                            ).reset_index(drop=True)
@@ -391,7 +456,9 @@ def scored(opp: pd.DataFrame) -> pd.DataFrame:
 
     * benefit: half of it is reach (journeys concerned, against the largest in
       the table), 35% the requests saved, 15% the citizen-days between the two
-      services;
+      services. When the log says which requests failed, 15% goes to the
+      failed requests concerned instead, taken evenly from the other three:
+      an integration removes the occasions on which those failures happen;
     * certainty: 1 when MITOS confirms the dependency, 0.85 when the register
       was not consulted or does not apply, 0.65 when the pair is not in MITOS;
       and for pairs, less when the lift is below 2;
@@ -409,6 +476,8 @@ def scored(opp: pd.DataFrame) -> pd.DataFrame:
 
     benefit = (0.5 * share("journeys") + 0.35 * share("requests_saved")
                + 0.15 * share("citizen_days_between"))
+    if "failed_requests" in opp.columns and opp.failed_requests.max() > 0:
+        benefit = 0.85 * benefit + 0.15 * share("failed_requests")
     certainty = opp.register.map({"confirmed by MITOS": 1.0, "not in MITOS": 0.65}
                                  ).fillna(0.85)
     certainty = certainty * (0.5 + opp.lift.clip(upper=2) / 4).fillna(1.0)
@@ -450,7 +519,10 @@ def annotate(log: pd.DataFrame, best: pd.DataFrame) -> pd.DataFrame:
     * ``case:requests``, ``case:organisations``: how many requests the journey
       took and how many bodies it involved;
     * ``case:repeated_requests``: requests for a service the journey had
-      already requested.
+      already requested;
+    * ``case:failed_requests``: requests that failed or were abandoned, when
+      the log carries the outcome of each request (also on every event, as
+      ``outcome``).
 
     On every event:
 
@@ -504,6 +576,9 @@ def annotate(log: pd.DataFrame, best: pd.DataFrame) -> pd.DataFrame:
     out["case:organisations"] = out.groupby(j)["org:role"].transform(
         lambda x: x[x != ""].nunique()).astype(int)
     out["case:repeated_requests"] = (nth > 0).groupby(j).transform("sum").astype(int)
+    if "outcome" in out.columns:
+        out["case:failed_requests"] = (out.outcome != "completed").groupby(j).transform(
+            "sum").astype(int)
     return out
 
 
@@ -527,6 +602,9 @@ def report(opp: pd.DataFrame, log: pd.DataFrame, source: str, per_type: int = 8)
             text.append(f"- Requests a citizen would no longer make: {r.requests_saved:,}")
         if r.citizen_days_between:
             text.append(f"- Citizen-days between the two today: {r.citizen_days_between:,}")
+        if getattr(r, "failed_requests", 0):
+            text.append(f"- Requests concerned that failed or were abandoned: "
+                        f"{r.failed_requests:,} ({r.failure_rate:.0%})")
         text.append(f"- Effort: {r.difficulty}")
         if r.register not in ("not checked", "does not apply"):
             text.append(f"- Register: {r.register}"
@@ -577,6 +655,8 @@ def report(opp: pd.DataFrame, log: pd.DataFrame, source: str, per_type: int = 8)
               "pair, when the lift is low, and as effort rises. The weights are choices.",
               "- **Requests saved** counts the requests citizens made that the integration "
               "would make unnecessary.",
+              "- **Failed or abandoned** counts, among the requests concerned, those that "
+              "did not complete. Each one sent a citizen back to try again.",
               "- **Citizen-days between** adds up the time from the end of the first service "
               "to the start of the second. It is an upper bound on the time saved, not an "
               "estimate of it.",

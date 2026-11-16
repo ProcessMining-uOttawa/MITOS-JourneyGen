@@ -479,18 +479,35 @@ effort, numbered the same way:
 A pair that goes together in the log but is *not in MITOS* may be a dependency
 nobody wrote down.
 
+**What counts.** A pair needs 10 journeys, a tenth of the journeys of its kind,
+and a lift of 1.5. An unordered pair is left out when both services already
+belong to the entry point of their life event: the entry point says once what
+the pairs would say for every two of its services. On the default dataset that
+leaves 91 recommendations, 22 of them unordered pairs; before these rules there
+were 123 and 50.
+
+**Failed requests.** `truth_instances.csv` says how each request ended, as a
+real system's status field would. With it, each recommendation counts the
+requests concerned that failed or were abandoned, each of which sent a citizen
+back to try again, and that count weighs in the score. `journey_log` carries
+`outcome` on every event and `failed_requests` on every journey. The generator
+draws failures at random, so here they say how failure-prone the services are,
+not that a missing document caused them.
+
 **The ten best trade-offs.** Every recommendation gets a score from 0 to 100,
 and the report opens with the ten highest, at most three per kind of journey
 and four of one kind of recommendation. The score multiplies three things:
-benefit (half of it reach, 35% requests saved, 15% waiting), certainty (full
-when MITOS confirms the pair, less when it does not or when the lift is low)
-and effort (full at level 1, down to 55% at level 4). The weights are choices;
+benefit (half of it reach, 35% requests saved, 15% waiting; with outcomes in
+the log, 15% goes to failed requests instead, taken evenly from those three),
+certainty (full when MITOS confirms the pair, less when it does not or when the
+lift is low) and effort (full at level 1, down to 55% at level 4). The weights are choices;
 they make the ranking reproducible and open to argument, not right.
 
-On the default dataset the list opens with one entry point for getting a
-passport (233 journeys, score 45) and for a death in the family (153 journeys,
-score 40), then *Death registration act* and *Certificate of closest relatives*
-as one step (123 journeys, one organisation, confirmed by MITOS, score 38).
+On the default dataset the list opens with *Death registration act* and
+*Certificate of closest relatives* as one step (123 journeys, one organisation,
+confirmed by MITOS, 86 failed requests among those concerned, score 44), then
+one entry point for getting a passport (233 journeys, score 43) and for a death
+in the family (153 journeys, score 43).
 
 **The ranking travels with the log.** `journey_log` carries it as attributes:
 
@@ -498,7 +515,8 @@ as one step (123 journeys, one organisation, confirmed by MITOS, score 38).
 |---|---|---|
 | `top_opportunity` | journey | The best-ranked of the ten that this journey shows, or "none". |
 | `opportunity_rank` | journey | Its rank, 0 for none. |
-| `requests`, `organisations`, `repeated_requests` | journey | Numbers: requests made, bodies involved, requests for something already requested. |
+| `requests`, `organisations`, `repeated_requests`, `failed_requests` | journey | Numbers: requests made, bodies involved, requests for something already requested, requests that failed or were abandoned. |
+| `outcome` | event | How the request ended: completed, unsuccessful or abandoned. |
 | `avoidable_request` | event | "yes" when a ranked recommendation would make this request unnecessary. |
 | `repeated_request` | event | "yes" for a second or later request of a service in the journey. |
 

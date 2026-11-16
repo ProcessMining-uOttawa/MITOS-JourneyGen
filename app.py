@@ -1335,13 +1335,18 @@ def view_bundles() -> None:
                         "start by itself when the first ends.",
             "fetch": "The first is an input of the second: nearly every journey with the "
                      "second has the first before it. The second could obtain it itself.",
-            "together": "Citizens need both, in either order.",
+            "together": "Citizens need both, in either order. Pairs that the entry point "
+                        "of their life event already covers are not repeated here.",
             "reuse": "A result the citizen already has is requested again in the same "
                      "journey.",
             "start": "Citizens request the first almost only for the second, but only some "
                      "need it: an occasional input.",
         }
         st.markdown("\n".join(f"- **{bd.TYPES[k]}.** {v}" for k, v in meaning.items()))
+        st.caption("A pair must also occur in at least a tenth of the journeys of its kind. "
+                   "Where the log says which requests failed or were abandoned, each "
+                   "recommendation counts them among the requests it concerns, and they "
+                   "weigh in the score: point at the evidence to read the figure.")
         st.caption("The numbers order the kinds by how much each typically changes for "
                    "citizens, 1 the most: a judgement, not a measurement. Effort is numbered "
                    "the same way, from 1 low (one organisation) to 4 very high (across "
@@ -1353,7 +1358,7 @@ def view_bundles() -> None:
                                "the other.")
         need = c2.number_input("Journeys needed", 3, 500, 10,
                                help="A pair seen in fewer journeys is left out.")
-        lift = c3.number_input("Lift needed", 1.0, 10.0, 1.2, 0.1,
+        lift = c3.number_input("Lift needed", 1.0, 10.0, 1.5, 0.1,
                                help="How much more than chance the two must go together.")
     use_register = st.toggle(
         "Say whether MITOS confirms each dependency", value=True,
@@ -1384,7 +1389,9 @@ def view_bundles() -> None:
             st.markdown(
                 "- **Benefit.** Half is reach: the journeys concerned, against the largest "
                 "in the table. 35% is the requests citizens would no longer make, 15% the "
-                "citizen-days between the two services today.\n"
+                "citizen-days between the two services today. When the log says which "
+                "requests failed or were abandoned, 15% goes to those among the requests "
+                "concerned, taken evenly from the other three.\n"
                 "- **Certainty.** Full when MITOS confirms the dependency, 85% when the "
                 "register does not apply or was not consulted, 65% when the pair is not in "
                 "MITOS. For pairs it is also reduced when the lift is below 2.\n"
