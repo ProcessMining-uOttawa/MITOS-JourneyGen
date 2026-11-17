@@ -1,13 +1,13 @@
 name: Refresh MITOS catalogue
 
-# Every Monday: download all of MITOS again, compare with the catalogue in the
+# On the first of every month: download all of MITOS again, compare with the catalogue in the
 # repository, and commit the new one only when its content differs. Each
 # refresh is tagged, so an older catalogue stays available. The new catalogue
 # also goes to the release branch, which the deployed app watches.
 
 on:
   schedule:
-    - cron: "17 3 * * 1"
+    - cron: "17 3 1 * *"
   workflow_dispatch:
 
 permissions:

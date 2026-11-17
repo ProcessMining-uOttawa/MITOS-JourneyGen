@@ -31,7 +31,7 @@ def test_a_release_moves_the_branch_the_deployed_app_watches():
     release = read(".github", "workflows", "release.yml")
     assert "types: [published]" in release and "refs/heads/release" in release
     assert "generate.py --version" in release          # a mistagged release is refused
-    # and the weekly catalogue reaches that branch too
+    # and the monthly catalogue reaches that branch too
     assert "git push origin release" in read(".github", "workflows", "refresh-catalogue.yml")
 
 

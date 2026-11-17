@@ -2,7 +2,14 @@
 
 What changed in each release of MITOS-JourneyGen, newest first. Changes to the
 MITOS catalogue itself are in [CATALOGUE_CHANGES.md](CATALOGUE_CHANGES.md) once
-a weekly refresh has found any.
+a monthly refresh has found any.
+
+## Unreleased
+
+- The catalogue is refreshed from MITOS on the first of every month
+  instead of every Monday.
+- The README shows the app, links the introduction slides and opens with
+  the logo.
 
 ## 0.1.0 - 2026-11-16
 
