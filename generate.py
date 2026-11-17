@@ -31,7 +31,7 @@ import re
 import time
 from xml.sax.saxutils import quoteattr
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DAY = 86400.0

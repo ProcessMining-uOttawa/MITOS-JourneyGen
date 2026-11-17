@@ -4,12 +4,20 @@ What changed in each release of MITOS-JourneyGen, newest first. Changes to the
 MITOS catalogue itself are in [CATALOGUE_CHANGES.md](CATALOGUE_CHANGES.md) once
 a monthly refresh has found any.
 
-## Unreleased
+## 0.1.1 - 2026-11-17
+
+The catalogue follows MITOS monthly, and the documentation shows the tool.
 
 - The catalogue is refreshed from MITOS on the first of every month
-  instead of every Monday.
-- The README shows the app, links the introduction slides and opens with
-  the logo.
+  instead of every Monday. The app says so on its Start page and in the
+  Catalogue view.
+- The README opens with the logo and links to the app, the slides, the
+  method guide and this changelog, and shows the app and PM4Py-UCM in
+  eight screenshots.
+- Introduction slides in `docs/presentation/` (PDF and PPTX, with speaker
+  notes) walk through the default dataset from the question to a
+  recommendation.
+- `assets/social/` holds the repository's social preview.
 
 ## 0.1.0 - 2026-11-16
 
