@@ -12,6 +12,23 @@ in [MITOS](https://mitos.gov.gr), the Greek National Register of Administrative
 Procedures, and the evidence one procedure needs from another comes from MITOS
 too.
 
+![The Start page of the app: four steps to a first result](docs/images/app_start.png)
+
+## Introduction in slides
+
+New here? The slides walk through the base example (2,000 citizens, seed 1)
+from the question to a recommendation: the MITOS catalogue, a life event,
+generating and inspecting the log, finding journeys and scoring the methods,
+the ranked integration opportunities, and the journey log opened in
+[PM4Py-UCM](https://github.com/ProcessMining-uOttawa/pm4py-ucm), split into one
+model per kind of journey. Every slide has speaker notes.
+
+- [Read the slides (PDF, 23 pages)](docs/presentation/MITOS-JourneyGen-introduction.pdf)
+- [Download them for PowerPoint (PPTX)](docs/presentation/MITOS-JourneyGen-introduction.pptx)
+
+The hosted app is at <https://mitos-journeygen.streamlit.app> (private for
+now: ask for access).
+
 ## Quick start
 
 Python 3.10 or later. The generator uses the standard library only; the methods
@@ -86,6 +103,13 @@ them, and the words the tool uses.
   they are too few to judge *shared found*.
 - **Catalogue.** The date of the MITOS snapshot, what the last refresh changed,
   and a refresh on demand.
+
+| | |
+|---|---|
+| ![A life event told as a story](docs/images/app_scenario.png) | ![Generating 20,000 citizens, with progress and a Stop button](docs/images/app_generate.png) |
+| **Scenarios.** *Death of a close relative*, read as a story. | **Generate.** A large run, with its estimate and progress. |
+| ![One citizen's service requests on a time axis](docs/images/app_timeline.png) | ![Four methods scored against the ground truth](docs/images/app_scores.png) |
+| **Inspect.** One citizen, four overlapping episodes. | **Score a method.** Every method against the truth. |
 
 **Remarks on unrealistic values.** Where a value is set, and again before a
 run, the app points at values that are allowed but probably not meant: a life
@@ -498,6 +522,8 @@ out and states each finding as a recommendation:
 The numbers order the kinds by how much each typically changes for citizens,
 1 the most. That order is a judgement, not a measurement.
 
+![The ten best trade-offs on the default dataset, in the Bundles to integrate view](docs/images/app_opportunities.png)
+
 Each recommendation comes with its evidence in a sentence, the requests
 citizens would no longer make, the citizen-days between the two services today
 (an upper bound on time saved), whether MITOS confirms the dependency, and the
@@ -566,9 +592,25 @@ knows nothing of legal or technical feasibility.
 [PM4Py-UCM](https://github.com/ProcessMining-uOttawa/pm4py-ucm) reads it as an
 interval log and mines a map of the services citizens chain together, with the
 organisations as components, so the points where a journey crosses from one
-body to another are visible. Mine one model per kind (a model family
-partitioned on the case attribute `kind`, or a filter); all kinds in one model
-is too much to read. Use the XES rather than the CSV to keep both timestamps.
+body to another are visible. Mine one model per kind; all kinds in one model
+is too much to read. Since PM4Py-UCM 0.9.3 the simplest way is *Split by
+attribute* in the sidebar of the Model view, set to `case:kind`: one model per
+kind under a root map with one stub per kind (in Python,
+`discover_ucm_by_attribute(log, "case:kind")`). A model family partitioned on
+`kind`, or a filter, works too. Use the XES rather than the CSV to keep both
+timestamps.
+
+![PM4Py-UCM, Model view: the journey log split by case:kind](docs/images/pm4py_ucm_split_by_kind.png)
+
+The model for *Getting a passport*, in BPMN notation, with the organisations as
+coloured boxes: MyPhoto and the solemn declaration (Digital Governance) before the
+issuance (Citizen Protection), and a birth certificate (Interior) only when
+none is valid.
+
+![The passport journeys mined by PM4Py-UCM, in BPMN notation](docs/images/pm4py_ucm_passport_bpmn.png)
+
+The same split works on the raw `events.csv`, set to `service`: one model per
+procedure, which describes each procedure but not which go together.
 
 The ranking attributes are case attributes there, so they can be used like any
 other: a model family partitioned on `top_opportunity` sets the journeys that
