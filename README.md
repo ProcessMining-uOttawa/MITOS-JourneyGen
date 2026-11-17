@@ -1,3 +1,17 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo_dark.svg">
+    <img src="assets/logo_light.svg" alt="MITOS-JourneyGen" width="420">
+  </picture>
+</p>
+
+<p align="center">
+  <a href="https://mitos-journeygen.streamlit.app"><b>Open the app</b></a> ·
+  <a href="docs/presentation/MITOS-JourneyGen-introduction.pdf"><b>Introduction slides</b></a> ·
+  <a href="docs/methods.md"><b>Method guide</b></a> ·
+  <a href="CHANGELOG.md"><b>Changelog</b></a>
+</p>
+
 # MITOS-JourneyGen: synthetic logs of citizens using public services
 
 A generator of event logs in which citizens use several Greek public services,
@@ -26,8 +40,8 @@ model per kind of journey. Every slide has speaker notes.
 - [Read the slides (PDF, 23 pages)](docs/presentation/MITOS-JourneyGen-introduction.pdf)
 - [Download them for PowerPoint (PPTX)](docs/presentation/MITOS-JourneyGen-introduction.pptx)
 
-The hosted app is at <https://mitos-journeygen.streamlit.app> (private for
-now: ask for access).
+The hosted app is at <https://mitos-journeygen.streamlit.app>. When it has
+not been used for a while it sleeps, and waking it takes about a minute.
 
 ## Quick start
 
