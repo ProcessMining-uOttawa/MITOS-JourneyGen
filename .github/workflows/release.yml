@@ -4,7 +4,7 @@ name: Release
 # app watches that branch, so it updates with every release and with nothing
 # else: work merged into main stays out of sight until it is released.
 #
-# Nobody commits to `release` by hand. Besides this job, only the weekly
+# Nobody commits to `release` by hand. Besides this job, only the monthly
 # catalogue refresh writes to it, to carry a new catalogue to the deployed app.
 
 on:

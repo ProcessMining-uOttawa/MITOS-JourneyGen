@@ -401,7 +401,7 @@ def view_start() -> None:
     st.subheader("And keep it current")
     with st.container(border=True):
         st.markdown(f"**{ICONS['Catalogue']} Catalogue**")
-        st.write("The procedures come from a snapshot of MITOS, refreshed every week. See "
+        st.write("The procedures come from a snapshot of MITOS, refreshed every month. See "
                  "its date, what the last refresh changed and which life events that "
                  "touches, or look up any procedure and its steps.")
         st.button("Go to Catalogue", on_click=goto, args=("Catalogue",), width="stretch")
@@ -1660,7 +1660,7 @@ def refresh_from_mitos() -> None:
     with st.expander("Refresh from MITOS now"):
         st.caption("Downloads every procedure again (about 5,000 small documents, a quarter "
                    "of an hour) and replaces the catalogue if its content differs. The "
-                   "scheduled job does the same every Monday; use this to be ahead of it.")
+                   "scheduled job does the same on the first of every month; use this to be ahead of it.")
         c1, c2, _ = st.columns([1, 1, 4])
         go = c1.button("Refresh", type="primary", width="stretch")
         stop = c2.button("Stop", key="stop_refresh", width="stretch",
@@ -1738,7 +1738,7 @@ def view_catalogue() -> None:
     c1.metric("Snapshot of MITOS", cat.meta["retrieved"], border=True)
     c2.metric("Procedures", f"{len(cat.procedures):,}", border=True)
     c3.metric("With evidence links", f"{linked:,}", border=True)
-    st.caption("A scheduled job downloads MITOS again every Monday and replaces the catalogue "
+    st.caption("A scheduled job downloads MITOS again on the first of every month and replaces the catalogue "
                "when its content differs. The app always uses the latest; each refresh is "
                "tagged `catalogue-<date>` in the repository, so an older one can be checked "
                "out to reproduce an earlier dataset.")

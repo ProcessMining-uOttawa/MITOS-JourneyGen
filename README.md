@@ -268,7 +268,7 @@ a scenario.
 ### Keeping up with MITOS
 
 A scheduled job (`.github/workflows/refresh-catalogue.yml`) downloads all of
-MITOS again every Monday, compares the result with the catalogue in the
+MITOS again on the first of every month, compares the result with the catalogue in the
 repository and commits the new one only when its content differs. It writes
 what changed to `CATALOGUE_CHANGES.md` and `catalogue_changes.json`: new,
 withdrawn and changed procedures, and which bundled scenarios are affected.
@@ -323,7 +323,7 @@ Publishing does the rest. The *Release* workflow checks that the tag is the
 version the code states and moves the `release` branch to it. A hosted app that
 watches that branch updates by itself, with every release and with nothing
 else: work merged into `main` stays out of sight until it is released. The
-weekly catalogue refresh also writes the new catalogue to `release`, so the
+monthly catalogue refresh also writes the new catalogue to `release`, so the
 hosted app follows MITOS between releases. Nobody commits to `release` by hand.
 
 ### On Streamlit Community Cloud
