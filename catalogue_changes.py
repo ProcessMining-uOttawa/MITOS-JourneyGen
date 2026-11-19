@@ -26,6 +26,7 @@ HEADER = ("# Catalogue changes\n\n"
 
 
 def load(path: str) -> dict:
+    """A catalogue (``catalogue.json.gz``) as a dict."""
     with gzip.open(path, "rt", encoding="utf-8") as f:
         return json.load(f)
 
@@ -66,6 +67,10 @@ def differences(a: dict, b: dict) -> list:
 
 
 def compare(old: dict, new: dict, scenarios: dict | None = None) -> dict:
+    """What changed from catalogue ``old`` to ``new``: dates, new, withdrawn and
+    changed procedures (with :func:`differences`), and, given ``scenarios``,
+    the points in them that the changes touch. ``any`` says whether anything
+    changed."""
     po, pn = old["procedures"], new["procedures"]
     title = lambda p: p["title_en"] or p["title"]  # noqa: E731
     added = sorted(set(pn) - set(po))
@@ -127,6 +132,7 @@ def compare(old: dict, new: dict, scenarios: dict | None = None) -> dict:
 
 
 def markdown(r: dict, limit: int = 40) -> str:
+    """The comparison ``r`` as a Markdown section, at most ``limit`` rows per list."""
     lines = [f"## {r['to']}", "",
              f"Compared with {r['from']}: {len(r['new'])} new, {len(r['withdrawn'])} withdrawn, "
              f"{len(r['changed'])} changed, of {r['procedures']} procedures.", ""]
@@ -171,6 +177,7 @@ def record(r: dict, json_path: str, log_path: str) -> None:
 
 
 def main() -> None:
+    """The command line: ``python catalogue_changes.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("old")
     ap.add_argument("new")

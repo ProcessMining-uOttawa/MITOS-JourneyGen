@@ -18,3 +18,7 @@ out*/repeated_requests.csv
 # other generated datasets; the default one in out/ is kept
 out_*/
 .pytest_cache/
+# API documentation, built by docs/build_api_docs.py
+docs/api/
+# coverage data
+.coverage

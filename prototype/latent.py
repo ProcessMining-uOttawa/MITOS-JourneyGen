@@ -42,6 +42,12 @@ SQRT2PI = math.sqrt(2 * math.pi)
 
 def fit(inst: pd.DataFrame, kinds: int = 12, min_pairs: int = 15, min_brought: float = 4.0,
         iters: int = 120, seed: int = 0, also_parent: float = 0.25, verbose: bool = False):
+    """Journeys found by the latent life-event model, from one random start.
+
+    ``kinds`` hidden kinds of event (plus a no-event kind) each bring a set
+    of services after a first instance; the model is fitted by mean-field EM.
+    Returns the kinds found, the overlapping journeys, a partition, and the
+    log-likelihood (to pick the best of several starts)."""
     rng = np.random.default_rng(seed)
     inst = inst.reset_index(drop=True)
     day = ((inst.start - inst.start.min()).dt.total_seconds() / 86400).to_numpy()
@@ -202,6 +208,7 @@ def fit(inst: pd.DataFrame, kinds: int = 12, min_pairs: int = 15, min_brought: f
 
 
 def main() -> None:
+    """The command line: ``python prototype/latent.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("folder", help="folder holding events.csv")
     ap.add_argument("--kinds", type=int, default=12)

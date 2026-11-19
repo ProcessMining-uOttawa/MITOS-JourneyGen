@@ -9,6 +9,7 @@
   <a href="https://mitos-journeygen.streamlit.app"><b>Open the app</b></a> ·
   <a href="docs/presentation/MITOS-JourneyGen-introduction.pdf"><b>Introduction slides</b></a> ·
   <a href="docs/methods.md"><b>Method guide</b></a> ·
+  <a href="https://processmining-uottawa.github.io/MITOS-JourneyGen/"><b>API documentation</b></a> ·
   <a href="CHANGELOG.md"><b>Changelog</b></a>
 </p>
 
@@ -339,6 +340,24 @@ hosted app follows MITOS between releases. Nobody commits to `release` by hand.
 There the app hides *Refresh from MITOS now* and allows 5,000 citizens. To
 change the limit, add `MITOS_MAX_CITIZENS = "..."` to the app's secrets.
 
+## API documentation
+
+The modules (`generate`, `build_catalogue`, `catalogue_changes`, `bundles`)
+and the prototype methods are documented from their docstrings at
+<https://processmining-uottawa.github.io/MITOS-JourneyGen/>, published for every
+release by the *API documentation* workflow. To build it locally:
+
+```bash
+pip install pdoc
+```
+
+```bash
+python docs/build_api_docs.py
+```
+
+It writes `docs/api/` (not committed). `app.py` is left out: it is the
+Streamlit page, which runs as soon as it is imported.
+
 ## Tests
 
 ```bash
@@ -353,7 +372,35 @@ the command line's for the same seed, and a scenario naming a missing
 procedure is reported. The remarks themselves have their own tests, and one
 test regenerates `out/` from seed 1 and compares it byte for byte.
 
-The same tests run on GitHub for every pull request, on Linux and on Windows. The catalogue
+With coverage, and the security scan:
+
+```bash
+python -m pytest tests -q --cov --cov-report=term-missing
+```
+
+```bash
+python -m bandit -r . -c bandit.yaml
+```
+
+Coverage is about 90% of the code (`.coveragerc` leaves out the tests and the
+logo script); the app is the least covered, since file uploads and the
+catalogue refresh cannot be driven without a browser. Coverage only says the
+code was run. `tests/mutation_check.py` checks that the tests would notice a
+bug: it plants 22 realistic ones, one at a time (an XES attribute left
+unescaped, an expired certificate reused, a failed download accepted as a
+refresh, precision and recall swapped, ...), runs the tests, and reports
+any bug that no test caught. It takes about twenty minutes:
+
+```bash
+python tests/mutation_check.py
+```
+
+With `--without-golden` it leaves out the test that regenerates `out/` byte
+for byte. That test notices any change, wanted or not, without saying what
+went wrong; without it, every planted bug must break a test of a stated rule.
+
+The same tests run on GitHub for every pull request, on Linux and on Windows,
+with a coverage floor of 85%, and bandit must report nothing. The catalogue
 download and comparison are tested against a made-up MITOS, with no network.
 Others check what a release and a hosted deployment rely on: the version and
 the changelog agree, the committed configuration fixes no port, and the

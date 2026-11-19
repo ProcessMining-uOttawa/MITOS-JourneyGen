@@ -17,17 +17,31 @@ import datetime as dt
 import gzip
 import json
 import os
+import re
 import time  # noqa: F401 - also used by the command line's progress
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 API = "https://api.digigov.grnet.gr/v1/"
+_ID = re.compile(r"[0-9]{1,12}")
 
 
 def _get(url: str) -> dict:
+    """GET a JSON document from the MITOS API, and from nowhere else."""
+    if not url.startswith(API):
+        raise ValueError(f"not a MITOS API address: {url!r}")
     req = urllib.request.Request(url, headers={"User-Agent": "MITOS-JourneyGen"})
-    with urllib.request.urlopen(req, timeout=60) as r:
+    # The address is checked above: https, on the MITOS API host only.
+    with urllib.request.urlopen(req, timeout=60) as r:  # nosec B310
         return json.loads(r.read().decode("utf-8"))
+
+
+def _procedure_id(value) -> str:
+    """A procedure id from the API, checked before it names a file or a URL."""
+    pid = str(value)
+    if not _ID.fullmatch(pid):
+        raise ValueError(f"unexpected procedure id from MITOS: {pid!r}")
+    return pid
 
 
 def _paged(endpoint: str, limit: int) -> list:
@@ -83,8 +97,9 @@ def download(cache: str, progress=None) -> list:
         print("could not fetch", sub, pid, repr(err)[:80])
         failed.append((sub, pid))
 
-    jobs = [(r["id"], "proc", "") for r in rows]
-    jobs += [(r["id"], "proc_en", "?lang=en") for r in rows if r["title"].get("en")]
+    jobs = [(_procedure_id(r["id"]), "proc", "") for r in rows]
+    jobs += [(_procedure_id(r["id"]), "proc_en", "?lang=en") for r in rows
+             if r["title"].get("en")]
     pool = ThreadPoolExecutor(3)
     try:
         for done, _ in enumerate(pool.map(one, jobs), 1):
@@ -124,6 +139,11 @@ def _steps(raw: list, prefix: str) -> list:
 
 
 def build(cache: str) -> dict:
+    """The catalogue built from a cache filled by :func:`download`: for every
+    procedure its titles, owner, life events, validity, counter and digital
+    step trees and the procedures it requires as evidence, plus the official
+    Greek-to-English strings learnt from the procedures MITOS publishes in both
+    languages."""
     el = _load_dir(os.path.join(cache, "proc"))
     en = _load_dir(os.path.join(cache, "proc_en"))
     with open(os.path.join(cache, "orgs.json"), encoding="utf-8") as f:
@@ -193,6 +213,7 @@ def build(cache: str) -> dict:
 
 
 def main() -> None:
+    """The command line: ``python build_catalogue.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--cache", required=True, help="directory for the raw API answers")
     ap.add_argument("--offline", action="store_true", help="do not download, only rebuild")

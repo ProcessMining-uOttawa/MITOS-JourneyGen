@@ -1,0 +1,15 @@
+# Coverage of the code the tests are meant to exercise:
+#   python -m pytest --cov --cov-report=term-missing
+[run]
+source = .
+omit =
+    tests/*
+    assets/make_logo.py
+    paper/*
+    zenodo/*
+
+[report]
+skip_covered = false
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:

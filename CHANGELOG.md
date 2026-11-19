@@ -4,6 +4,33 @@ What changed in each release of MITOS-JourneyGen, newest first. Changes to the
 MITOS catalogue itself are in [CATALOGUE_CHANGES.md](CATALOGUE_CHANGES.md) once
 a monthly refresh has found any.
 
+## Unreleased
+
+**Security** (from a bandit scan, now clean and run on every pull request)
+
+- The catalogue download only fetches from the MITOS API over https, and
+  refuses a procedure id that is not a number before it names a file.
+- XES attributes are written with an escaper that also drops the control
+  characters XML 1.0 forbids, so free text from MITOS cannot make a log
+  invalid.
+- A run refuses values far outside what it can handle (a window of more than
+  ten years, life-event rates above two a year, chances outside 0 to 1,
+  delays of more than ten years ...), so a project file loaded into the hosted
+  app cannot make it run for ever.
+
+**Tests and documentation**
+
+- Coverage rose from 81% to about 90%, now measured in CI with a floor of 85%:
+  the command lines, the catalogue build and comparison, the scoring of
+  methods and the rules a generated log promises (durations within the MITOS
+  bounds, counter steps in office hours, the retry limit, reuse only while a
+  result is valid) have their own tests.
+- `tests/mutation_check.py` plants 22 realistic bugs and checks that the
+  tests catch each of them.
+- API documentation from the docstrings, built with pdoc and published on
+  GitHub Pages for every release; the public functions that had no docstring
+  have one.
+
 ## 0.1.1 - 2026-11-17
 
 The catalogue follows MITOS monthly, and the documentation shows the tool.
