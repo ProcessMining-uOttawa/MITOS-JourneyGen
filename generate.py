@@ -32,7 +32,7 @@ import re
 import sys
 import time
 
-__version__ = "0.1.1"
+__version__ = "1.0.0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DAY = 86400.0

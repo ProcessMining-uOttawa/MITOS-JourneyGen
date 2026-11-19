@@ -4,7 +4,12 @@ What changed in each release of MITOS-JourneyGen, newest first. Changes to the
 MITOS catalogue itself are in [CATALOGUE_CHANGES.md](CATALOGUE_CHANGES.md) once
 a monthly refresh has found any.
 
-## Unreleased
+## 1.0.0 - 2026-11-19
+
+The first stable release: the generator, its file formats and its command
+lines are now considered stable. Since 0.1.1, the work has gone into making
+the tool safe, well tested and documented; generated logs are unchanged
+(the default dataset in `out/` is reproduced byte for byte).
 
 **Security** (from a bandit scan, now clean and run on every pull request)
 

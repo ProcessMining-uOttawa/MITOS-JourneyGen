@@ -31,5 +31,5 @@ what MITOS-JourneyGen does and how to run it.
   refresh `mutation_results.json` first, then the report.
 - The API documentation updates itself at each release (the *API
   documentation* workflow); nothing to commit.
-- Screenshots and slides are made by hand and show version 0.1.x; replace them
+- Screenshots are made by hand (with version 0.1.x of the app); replace them
   when the app changes visibly.
