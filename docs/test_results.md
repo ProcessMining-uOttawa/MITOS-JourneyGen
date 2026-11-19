@@ -1,10 +1,10 @@
 # Test results
 
-MITOS-JourneyGen 0.1.1, run on 2026-11-19 with Python 3.13.2 on Windows. Written by `docs/build_test_report.py`; the strategy behind these tests is in [testing.md](testing.md).
+MITOS-JourneyGen 1.0.0, run on 2026-11-19 with Python 3.13.2 on Windows. Written by `docs/build_test_report.py`; the strategy behind these tests is in [testing.md](testing.md).
 
 | | |
 |---|---|
-| Test cases | **104 of 104 passed** in 212 s |
+| Test cases | **104 of 104 passed** in 211 s |
 | Statement coverage | **92%** (2,553 of 2,769 statements) |
 | Security scan (bandit) | **0 issues** in 4,659 lines; 7 reviewed exceptions marked `# nosec` |
 | Mutation check | **22 of 22 planted bugs caught** without the byte-for-byte test (2026-11-19) |
@@ -61,17 +61,17 @@ Drive the app without a browser: every view renders, a log is generated in both 
 
 | Test case | Result | Seconds |
 |---|---|---:|
-| Every view renders before a log exists | passed | 14.6 |
-| The start page leads to generate | passed | 1.7 |
-| A scenario is a story first and an editor on request | passed | 1.4 |
-| Picking a life event once is enough | passed | 2.4 |
-| The method guide opens as a page of its own | passed | 0.4 |
+| Every view renders before a log exists | passed | 14.7 |
+| The start page leads to generate | passed | 1.6 |
+| A scenario is a story first and an editor on request | passed | 1.3 |
+| Picking a life event once is enough | passed | 2.0 |
+| The method guide opens as a page of its own | passed | 0.5 |
 | Unrealistic values are pointed out where they are set | passed | 2.4 |
-| Generate inspect and score (CSV-events.csv) | passed | 17.1 |
-| Generate inspect and score (XES, gzipped-events.xes.gz) | passed | 17.9 |
-| The latent models kinds reach the bundles view | passed | 40.5 |
-| The same seed gives the same log as the command line | passed | 5.2 |
-| A scenario naming a withdrawn procedure is reported | passed | 0.8 |
+| Generate inspect and score (CSV-events.csv) | passed | 16.4 |
+| Generate inspect and score (XES, gzipped-events.xes.gz) | passed | 17.6 |
+| The latent models kinds reach the bundles view | passed | 38.4 |
+| The same seed gives the same log as the command line | passed | 4.8 |
+| A scenario naming a withdrawn procedure is reported | passed | 0.9 |
 
 ### `tests/test_assets.py` (3 of 3 passed)
 
@@ -94,17 +94,17 @@ From journeys to a service-level log and integration candidates.
 | Sequences and repeated requests | passed | 0.1 |
 | The xes holds a trace per journey with both timestamps | passed | 0.1 |
 | True episodes put a shared instance in both journeys | passed | 0.0 |
-| Each kind of recommendation is recognised | passed | 0.4 |
-| Evidence effort and the register are reported | passed | 0.7 |
+| Each kind of recommendation is recognised | passed | 0.3 |
+| Evidence effort and the register are reported | passed | 0.6 |
 | The kinds and the effort are numbered in order | passed | 0.0 |
 | The score rewards reach and certainty and charges effort | passed | 0.0 |
 | The top list is ranked and varied | passed | 0.4 |
-| The ranking travels with the journey log | passed | 0.7 |
+| The ranking travels with the journey log | passed | 0.9 |
 | A pair the entry point covers is not said twice | passed | 0.3 |
-| Rare and weakly tied pairs are left out | passed | 0.9 |
-| Failed requests are counted for each recommendation | passed | 0.9 |
+| Rare and weakly tied pairs are left out | passed | 1.0 |
+| Failed requests are counted for each recommendation | passed | 1.0 |
 | Rare pairs are not candidates | passed | 0.3 |
-| A pair explained by a popular service is not recommended | passed | 0.5 |
+| A pair explained by a popular service is not recommended | passed | 0.6 |
 
 ### `tests/test_catalogue.py` (4 of 4 passed)
 
@@ -115,7 +115,7 @@ The catalogue download and comparison, without the network.
 | Download reports progress and resumes | passed | 0.0 |
 | A document that cannot be fetched is reported | passed | 0.0 |
 | Progress can stop the download | passed | 0.0 |
-| Comparison finds what changed and which scenarios it touches | passed | 26.2 |
+| Comparison finds what changed and which scenarios it touches | passed | 28.6 |
 
 ### `tests/test_command_line.py` (31 of 31 passed)
 
@@ -123,18 +123,18 @@ The command lines, end to end on a small dataset, and the catalogue build from a
 
 | Test case | Result | Seconds |
 |---|---|---:|
-| Generate writes the log the truth and a manifest | passed | 10.3 |
-| Generate describe lists scenarios and remarks | passed | 0.4 |
+| Generate writes the log the truth and a manifest | passed | 8.8 |
+| Generate describe lists scenarios and remarks | passed | 0.3 |
 | Generate refuses a scenario it cannot run | passed | 0.3 |
-| Generate says when values look unrealistic | passed | 2.4 |
-| Bundles writes the answer files | passed | 3.5 |
+| Generate says when values look unrealistic | passed | 2.2 |
+| Bundles writes the answer files | passed | 2.7 |
 | Prototype discovery and scoring | passed | 5.6 |
 | Build catalogue offline from a cache | passed | 0.0 |
 | Build catalogue stops when documents are missing | passed | 0.0 |
 | Build catalogue downloads then builds | passed | 0.0 |
 | Catalogue changes command line | passed | 0.0 |
-| Catalogue changes refuses a download that lost procedures | passed | 0.0 |
-| The other prototype methods write journeys | passed | 4.0 |
+| Catalogue changes refuses a download that lost procedures | passed | 0.1 |
+| The other prototype methods write journeys | passed | 3.8 |
 | Each kind of change in a procedure is named (change0-title) | passed | 0.0 |
 | Each kind of change in a procedure is named (change1-steps: 2 to 1) | passed | 0.0 |
 | Each kind of change in a procedure is named (change2-steps: branching) | passed | 0.0 |
@@ -146,13 +146,13 @@ The command lines, end to end on a small dataset, and the catalogue build from a
 | Each kind of change in a procedure is named (change8-validity: P1Y to none) | passed | 0.0 |
 | Each kind of change in a procedure is named (change9-owner) | passed | 0.0 |
 | Every command line explains every option (generate.py) | passed | 0.2 |
-| Every command line explains every option (bundles.py) | passed | 1.7 |
+| Every command line explains every option (bundles.py) | passed | 1.6 |
 | Every command line explains every option (build_catalogue.py) | passed | 0.3 |
 | Every command line explains every option (catalogue_changes.py) | passed | 0.2 |
-| Every command line explains every option (prototype/discover.py) | passed | 1.5 |
-| Every command line explains every option (prototype/hawkes.py) | passed | 1.9 |
-| Every command line explains every option (prototype/latent.py) | passed | 1.5 |
-| Every command line explains every option (prototype/register.py) | passed | 1.5 |
+| Every command line explains every option (prototype/discover.py) | passed | 1.4 |
+| Every command line explains every option (prototype/hawkes.py) | passed | 1.8 |
+| Every command line explains every option (prototype/latent.py) | passed | 1.4 |
+| Every command line explains every option (prototype/register.py) | passed | 1.4 |
 | Every command line explains every option (prototype/score.py) | passed | 1.5 |
 
 ### `tests/test_default_dataset.py` (1 of 1 passed)
@@ -161,7 +161,7 @@ The dataset in ``out/`` is what the command line gives for seed 1, on every plat
 
 | Test case | Result | Seconds |
 |---|---|---:|
-| Out is reproduced by seed 1 | passed | 7.7 |
+| Out is reproduced by seed 1 | passed | 8.3 |
 
 ### `tests/test_generator_rules.py` (6 of 6 passed)
 
@@ -169,11 +169,11 @@ The rules a generated log promises, checked one by one on generated data.
 
 | Test case | Result | Seconds |
 |---|---|---:|
-| Every step lasts between the mitos minimum and maximum | passed | 2.2 |
+| Every step lasts between the mitos minimum and maximum | passed | 2.1 |
 | Counter steps happen in office hours | passed | 0.0 |
 | No instance is attempted more often than allowed | passed | 0.5 |
-| Failure branches follow their weight | passed | 2.8 |
-| Reuse follows its probability | passed | 6.7 |
+| Failure branches follow their weight | passed | 2.7 |
+| Reuse follows its probability | passed | 6.4 |
 | A certificate is reused only while it is valid | passed | 0.0 |
 
 ### `tests/test_release.py` (4 of 4 passed)
@@ -220,18 +220,18 @@ What the security assessment (bandit) led to: safe XES attributes, a downloader 
 | Test case | Result | Seconds |
 |---|---|---:|
 | Xml attributes are escaped and cleaned | passed | 0.0 |
-| An xes log with awkward labels is well formed | passed | 3.4 |
+| An xes log with awkward labels is well formed | passed | 3.3 |
 | The journey log xes is well formed | passed | 0.0 |
 | The downloader only fetches from the mitos api | passed | 0.0 |
 | A procedure id cannot name a file outside the cache | passed | 0.0 |
 | A download refuses a list with a strange id | passed | 0.0 |
-| The bundled scenarios are within the limits | passed | 0.3 |
-| Values that would run away stop a run (<lambda>-window) | passed | 0.3 |
+| The bundled scenarios are within the limits | passed | 0.2 |
+| Values that would run away stop a run (<lambda>-window) | passed | 0.2 |
 | Values that would run away stop a run (<lambda>-rate for 30-44) | passed | 0.3 |
-| Values that would run away stop a run (<lambda>-rate) | passed | 0.3 |
-| Values that would run away stop a run (<lambda>-chance) | passed | 0.3 |
+| Values that would run away stop a run (<lambda>-rate) | passed | 0.2 |
+| Values that would run away stop a run (<lambda>-chance) | passed | 0.2 |
 | Values that would run away stop a run (<lambda>-delay) | passed | 0.3 |
 | Values that would run away stop a run (<lambda>-background) | passed | 0.3 |
-| Values that would run away stop a run (<lambda>-max_attempts) | passed | 0.3 |
+| Values that would run away stop a run (<lambda>-max_attempts) | passed | 0.2 |
 | Values that would run away stop a run (<lambda>-retry_probability) | passed | 0.2 |
-| Values that would run away stop a run (<lambda>-evidence_depth) | passed | 0.3 |
+| Values that would run away stop a run (<lambda>-evidence_depth) | passed | 0.2 |
