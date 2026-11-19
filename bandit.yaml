@@ -1,0 +1,4 @@
+# Security scan: python -m bandit -r . -c bandit.yaml
+# The tests are left out: they assert by design (B101) and parse only the XML
+# they wrote themselves.
+exclude_dirs: ["tests", "out", ".git", "paper", "zenodo"]

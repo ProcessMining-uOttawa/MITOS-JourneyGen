@@ -27,6 +27,8 @@ SQRT2PI = math.sqrt(2 * math.pi)
 
 
 def instances(events_csv: str) -> pd.DataFrame:
+    """One row per service instance of ``events.csv``: citizen, service, and the
+    start of its first step and the end of its last."""
     ev = pd.read_csv(events_csv, usecols=["case_id", "citizen_id", "service_id", "service",
                                            "start_timestamp", "time:timestamp"],
                      parse_dates=["start_timestamp", "time:timestamp"])
@@ -48,6 +50,7 @@ def candidate_pairs(inst: pd.DataFrame) -> pd.DataFrame:
 
 
 def lognormal(d, mu, sigma):
+    """The log-normal density at ``d`` (days) with parameters ``mu`` and ``sigma``."""
     return np.exp(-(np.log(d) - mu) ** 2 / (2 * sigma ** 2)) / (d * sigma * SQRT2PI)
 
 
@@ -102,6 +105,8 @@ def fit(d: np.ndarray, chance, iters: int = 300):
 
 
 def components(n: int, edges) -> np.ndarray:
+    """The connected components of ``n`` nodes joined by ``edges`` (union-find):
+    an array giving each node the id of its component."""
     parent = list(range(n))
 
     def find(x):
@@ -173,6 +178,14 @@ def percolate(n: int, edges) -> list:
 
 def discover(inst: pd.DataFrame, min_pairs: int = 15, min_gain: float = 10.0,
              min_related: float = 8.0, link_at: float = 0.5):
+    """Journeys found by the delay-mixture method.
+
+    For each pair of services with at least ``min_pairs`` occurrences, fits
+    the delays of one citizen as a mixture of a related (log-normal) part and
+    the chance curve measured across citizens; pairs whose fit gains enough
+    are related, and instances are linked when they are more likely related
+    than not (``link_at``). Returns the related pairs, the links, the
+    overlapping journeys, a partition, and the window in days."""
     window = (inst.start.max() - inst.start.min()).total_seconds() / 86400
     cand = candidate_pairs(inst)
     rng = np.random.default_rng(0)
@@ -225,9 +238,12 @@ def discover(inst: pd.DataFrame, min_pairs: int = 15, min_gain: float = 10.0,
 
 
 def main() -> None:
+    """The command line: ``python prototype/discover.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("folder", help="folder holding events.csv")
-    ap.add_argument("--link-at", type=float, default=0.5)
+    ap.add_argument("--link-at", type=float, default=0.5,
+                    help="link two instances when the chance that they are related is at "
+                         "least this (default 0.5)")
     args = ap.parse_args()
     inst = instances(os.path.join(args.folder, "events.csv"))
     pairs, links, journeys, partition, window = discover(inst, link_at=args.link_at)

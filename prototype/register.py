@@ -47,6 +47,7 @@ _ISO = re.compile(r"^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?")
 
 
 def validity_days(iso: str | None) -> float | None:
+    """An ISO 8601 duration in days, or None when there is none."""
     m = _ISO.match(iso or "")
     if not m or not any(m.groups()):
         return None
@@ -55,6 +56,9 @@ def validity_days(iso: str | None) -> float | None:
 
 
 class Register:
+    """What MITOS states: which procedures each requires as evidence, and how
+    long a result stays valid (``default_validity`` days where MITOS gives
+    no validity)."""
     def __init__(self, catalogue: str, default_validity: float = 90.0):
         with gzip.open(catalogue, "rt", encoding="utf-8") as f:
             procs = json.load(f)["procedures"]
@@ -85,6 +89,8 @@ class Log:
         return len(self.case)
 
     def latest(self, citizen, service: str, before: float, valid: float):
+        """The latest instance of ``service`` for ``citizen`` that ended before
+        ``before`` and is still ``valid`` (days) then, or None."""
         got = self.by.get((citizen, service))
         if not got:
             return None
@@ -106,6 +112,9 @@ def uses(log: Log, reg: Register) -> list:
 
 
 def register_only(log: Log, links: list):
+    """Journeys from the register's links alone: each instance that nothing
+    else uses heads a journey of everything it used, directly or not.
+    Returns the overlapping journeys and a partition."""
     n = len(log)
     partition = pd.DataFrame({"case_id": log.case, "journey_id": components(n, links)})
     used_by: dict = {}
@@ -153,9 +162,11 @@ def add_register(journeys: pd.DataFrame, log: Log, reg: Register):
 
 
 def main() -> None:
+    """The command line: ``python prototype/register.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("folder", help="folder holding events.csv")
-    ap.add_argument("--catalogue", default=os.path.join(HERE, "..", "catalogue.json.gz"))
+    ap.add_argument("--catalogue", default=os.path.join(HERE, "..", "catalogue.json.gz"),
+                    help="MITOS catalogue snapshot (default ../catalogue.json.gz)")
     ap.add_argument("--validity-days", type=float, default=90.0,
                     help="validity assumed where the register gives none")
     args = ap.parse_args()

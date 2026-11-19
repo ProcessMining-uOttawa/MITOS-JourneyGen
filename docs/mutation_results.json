@@ -1,0 +1,160 @@
+{
+ "without_golden": true,
+ "date": "2026-11-19",
+ "mutants": [
+  {
+   "n": 1,
+   "file": "generate.py",
+   "bug": "XES attributes no longer escape &",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_security.py::test_xml_attributes_are_escaped_and_cleaned"
+  },
+  {
+   "n": 2,
+   "file": "generate.py",
+   "bug": "control characters reach the XES",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_security.py::test_xml_attributes_are_escaped_and_cleaned"
+  },
+  {
+   "n": 3,
+   "file": "generate.py",
+   "bug": "range check forgets the upper bound",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_security.py::test_values_that_would_run_away_stop_a_run[<lambda>-window]"
+  },
+  {
+   "n": 4,
+   "file": "generate.py",
+   "bug": "a value of the wrong type is not reported",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_security.py::test_values_that_would_run_away_stop_a_run[<lambda>-retry_probability]"
+  },
+  {
+   "n": 5,
+   "file": "generate.py",
+   "bug": "waits for a missing procedure accepted",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_review.py::test_a_procedure_waiting_for_one_the_scenario_does_not_list_stops_a_run"
+  },
+  {
+   "n": 6,
+   "file": "generate.py",
+   "bug": "expired certificates reused",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_generator_rules.py::test_a_certificate_is_reused_only_while_it_is_valid"
+  },
+  {
+   "n": 7,
+   "file": "generate.py",
+   "bug": "reuse chance inverted",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_generator_rules.py::test_reuse_follows_its_probability"
+  },
+  {
+   "n": 8,
+   "file": "generate.py",
+   "bug": "one retry too many",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_generator_rules.py::test_no_instance_is_attempted_more_often_than_allowed"
+  },
+  {
+   "n": 9,
+   "file": "generate.py",
+   "bug": "durations exceed the MITOS maximum",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_generator_rules.py::test_every_step_lasts_between_the_mitos_minimum_and_maximum"
+  },
+  {
+   "n": 10,
+   "file": "generate.py",
+   "bug": "counter open on Saturdays",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_generator_rules.py::test_counter_steps_happen_in_office_hours"
+  },
+  {
+   "n": 11,
+   "file": "generate.py",
+   "bug": "failure branches as likely as others",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_generator_rules.py::test_failure_branches_follow_their_weight"
+  },
+  {
+   "n": 12,
+   "file": "bundles.py",
+   "bug": "journeys of exactly min_size dropped",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_bundles.py::test_a_journey_becomes_a_case_and_a_service_an_activity"
+  },
+  {
+   "n": 13,
+   "file": "bundles.py",
+   "bug": "candidate pairs not filtered",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_bundles.py::test_rare_pairs_are_not_candidates"
+  },
+  {
+   "n": 14,
+   "file": "bundles.py",
+   "bug": "low-lift pairs recommended",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_bundles.py::test_a_pair_explained_by_a_popular_service_is_not_recommended"
+  },
+  {
+   "n": 15,
+   "file": "build_catalogue.py",
+   "bug": "downloader fetches from anywhere",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_security.py::test_the_downloader_only_fetches_from_the_mitos_api"
+  },
+  {
+   "n": 16,
+   "file": "build_catalogue.py",
+   "bug": "any procedure id names a file",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_security.py::test_a_procedure_id_cannot_name_a_file_outside_the_cache"
+  },
+  {
+   "n": 17,
+   "file": "build_catalogue.py",
+   "bug": "a procedure requires itself",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_command_line.py::test_build_catalogue_offline_from_a_cache"
+  },
+  {
+   "n": 18,
+   "file": "build_catalogue.py",
+   "bug": "an alternative overrides a mandatory link",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_command_line.py::test_build_catalogue_offline_from_a_cache"
+  },
+  {
+   "n": 19,
+   "file": "catalogue_changes.py",
+   "bug": "a failed download is accepted as a refresh",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_command_line.py::test_catalogue_changes_refuses_a_download_that_lost_procedures"
+  },
+  {
+   "n": 20,
+   "file": "catalogue_changes.py",
+   "bug": "a change of validity goes unreported",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_command_line.py::test_each_kind_of_change_in_a_procedure_is_named[change8-validity: P1Y to none]"
+  },
+  {
+   "n": 21,
+   "file": "prototype/score.py",
+   "bug": "F1 computed wrongly",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_score.py::test_pair_scores_on_a_case_worked_out_by_hand"
+  },
+  {
+   "n": 22,
+   "file": "prototype/score.py",
+   "bug": "precision and recall swapped",
+   "verdict": "killed",
+   "caught_by": "FAILED tests/test_score.py::test_pair_scores_on_a_case_worked_out_by_hand"
+  }
+ ]
+}

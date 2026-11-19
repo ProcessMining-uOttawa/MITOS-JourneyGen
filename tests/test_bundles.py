@@ -289,3 +289,32 @@ def test_failed_requests_are_counted_for_each_recommendation():
     # without outcomes nothing is claimed
     silent = bd.opportunities(opportunity_log(), min_journeys=4)
     assert (silent.failed_requests == 0).all() and "failed" not in silent.evidence.iloc[0]
+
+
+def test_rare_pairs_are_not_candidates():
+    log = bd.journey_log(*[pd.DataFrame(x) for x in chain(
+        12, [("Photo", 0), ("Passport", 5)], "passport")], {})
+    rare = bd.journey_log(*[pd.DataFrame(x) for x in chain(
+        3, [("Form", 0), ("Passport", 5)], "passport", start_day=40)], {})
+    both = pd.concat([log, rare.assign(**{"case:concept:name": "r" + rare["case:concept:name"]})])
+    pairs = {(r.first, r.then) for r in bd.candidates(both, min_journeys=10).itertuples()}
+    assert pairs == {("Photo", "Passport")}       # Form -> Passport: 3 journeys, below 10
+    assert ("Form", "Passport") in {(r.first, r.then) for r in
+                                    bd.candidates(both, min_journeys=3).itertuples()}
+
+
+def test_a_pair_explained_by_a_popular_service_is_not_recommended():
+    # B is in every journey of both kinds, so A -> B has a lift of 1: B's
+    # popularity alone explains that it follows A.
+    rows, members = [], []
+    for part in (chain(20, [("A", 0), ("B", 2)], "first"),
+                 chain(20, [("C", 0), ("B", 2)], "second")):
+        rows += part[0]
+        members += part[1]
+    log = bd.journey_log(pd.DataFrame(rows), pd.DataFrame(members), {})
+    def pair_recommended(**kw):
+        opp = bd.opportunities(log, None, **kw)
+        return any(r.first == "A" and r.then == "B" and not r.recommendation.startswith("1.")
+                   for r in opp.itertuples())
+    assert not pair_recommended()                 # default min_lift 1.5
+    assert pair_recommended(min_lift=0)           # the lift alone kept it out

@@ -33,10 +33,11 @@ import argparse
 import gzip
 import io
 import os
-from xml.sax.saxutils import quoteattr
 
 import numpy as np
 import pandas as pd
+
+from generate import xml_attr as _xml_attr
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -681,6 +682,7 @@ def requirements(catalogue_path: str | None = None) -> dict:
 
 
 def to_csv(log: pd.DataFrame) -> bytes:
+    """The journey log as CSV bytes, with both timestamps written to the second."""
     out = log.copy()
     for col in ("start_timestamp", "time:timestamp"):
         out[col] = out[col].dt.strftime("%Y-%m-%d %H:%M:%S")
@@ -695,7 +697,7 @@ def to_xes(log: pd.DataFrame, compress: bool = True) -> bytes:
     def attr(key, value):
         kind = "int" if isinstance(value, (int, np.integer)) and not isinstance(
             value, bool) else "string"
-        return f'<{kind} key={quoteattr(key)} value={quoteattr(str(value))}/>'
+        return f'<{kind} key={_xml_attr(key)} value={_xml_attr(value)}/>'
 
     stamp = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S") + "+00:00"  # noqa: E731
     buf = io.StringIO()
@@ -751,11 +753,13 @@ def true_journeys(truth: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
+    """The command line: ``python bundles.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("folder", help="folder holding truth_instances.csv")
     ap.add_argument("--journeys", help="a journeys CSV (case_id, journey_id[, kind]) from a "
                                        "method; without it, the true episodes are used")
-    ap.add_argument("--min-size", type=int, default=2)
+    ap.add_argument("--min-size", type=int, default=2,
+                    help="leave out journeys of fewer instances (default 2)")
     ap.add_argument("--no-register", action="store_true",
                     help="do not say whether MITOS confirms each dependency")
     args = ap.parse_args()

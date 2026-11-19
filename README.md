@@ -9,6 +9,8 @@
   <a href="https://mitos-journeygen.streamlit.app"><b>Open the app</b></a> ·
   <a href="docs/presentation/MITOS-JourneyGen-introduction.pdf"><b>Introduction slides</b></a> ·
   <a href="docs/methods.md"><b>Method guide</b></a> ·
+  <a href="https://processmining-uottawa.github.io/MITOS-JourneyGen/"><b>API documentation</b></a> ·
+  <a href="docs/testing.md"><b>Tests</b></a> ·
   <a href="CHANGELOG.md"><b>Changelog</b></a>
 </p>
 
@@ -64,6 +66,45 @@ the two; add `--gzip` for `events.xes.gz`. A trace is one service instance, and
 every event carries its completion in `time:timestamp` and its start in
 `start_timestamp`, the convention PM4Py reads as an interval log. The ground
 truth is CSV either way. A run of more than a few seconds reports its progress.
+
+## Command lines
+
+Everything the app does is also a command; each one explains its options
+with `--help`. They read and write plain files, so they can be chained:
+
+```bash
+python generate.py --citizens 2000 --seed 1 --out out/
+```
+
+```bash
+python prototype/hawkes.py out/
+```
+
+```bash
+python prototype/score.py out/
+```
+
+```bash
+python bundles.py out/ --journeys out/journeys_hawkes.csv
+```
+
+| Command | What it does | Main options |
+|---|---|---|
+| `generate.py` | Writes a log, its ground truth and a manifest | `--citizens` (2000), `--seed` (1), `--out` (`out/`), `--format csv\|xes\|both`, `--gzip`, `--lang en\|el\|both`, `--rate-scale` (a stress test), `--scenarios`, `--catalogue`, `--translations`, `--describe` (print the scenarios, generate nothing), `--version` |
+| `bundles.py FOLDER` | From journeys to an answer: the journey-level log for PM4Py-UCM and the ranked integration opportunities | `--journeys` (a method's journeys; the true episodes otherwise), `--min-size` (2), `--no-register` |
+| `prototype/discover.py FOLDER` | Journeys by a delay mixture per pair of services | `--link-at` (0.5) |
+| `prototype/hawkes.py FOLDER` | Journeys by a Hawkes process | `--verbose` |
+| `prototype/latent.py FOLDER` | Journeys and their kinds by a latent life-event model | `--kinds` (12), `--restarts` (3), `--verbose` |
+| `prototype/register.py FOLDER` | Journeys from MITOS's evidence links alone | `--catalogue`, `--validity-days` (90) |
+| `prototype/score.py FOLDER` | Scores every `journeys*.csv` in the folder against the truth, beside fixed-gap baselines | |
+| `build_catalogue.py` | Downloads MITOS and rebuilds `catalogue.json.gz` (about a quarter of an hour) | `--cache` (required), `--offline` (rebuild from the cache), `--out` |
+| `catalogue_changes.py OLD NEW` | What changed between two catalogues, and which scenarios it touches | `--scenarios`, `--json`, `--log`, `--force` (accept more than 5% withdrawn) |
+| `streamlit run app.py` | The web app (port 8612 with `run_local.cmd` or `run_local.sh`) | |
+
+The prototypes need numpy, pandas and scipy (`pip install -r
+prototype/requirements.txt`); `generate.py` needs only the standard library. What each
+method does is in [docs/methods.md](docs/methods.md), and every function is
+in the [API documentation](https://processmining-uottawa.github.io/MITOS-JourneyGen/).
 
 ## In the browser
 
@@ -339,25 +380,57 @@ hosted app follows MITOS between releases. Nobody commits to `release` by hand.
 There the app hides *Refresh from MITOS now* and allows 5,000 citizens. To
 change the limit, add `MITOS_MAX_CITIZENS = "..."` to the app's secrets.
 
+## API documentation
+
+The modules (`generate`, `build_catalogue`, `catalogue_changes`, `bundles`)
+and the prototype methods are documented from their docstrings at
+<https://processmining-uottawa.github.io/MITOS-JourneyGen/>, published for every
+release by the *API documentation* workflow. To build it locally:
+
+```bash
+pip install pdoc
+```
+
+```bash
+python docs/build_api_docs.py
+```
+
+It writes `docs/api/` (not committed). `app.py` is left out: it is the
+Streamlit page, which runs as soon as it is imported.
+
 ## Tests
+
+```bash
+pip install pytest pytest-cov bandit
+```
 
 ```bash
 python -m pytest tests -q
 ```
 
-The tests drive the app without a browser: every view renders, the Start page
-leads to Generate, a scenario reads as a story until editing is switched on,
-remarks appear where values are set, a log is generated as CSV and as XES and
-then inspected and scored with and without the register, the app's log equals
-the command line's for the same seed, and a scenario naming a missing
-procedure is reported. The remarks themselves have their own tests, and one
-test regenerates `out/` from seed 1 and compares it byte for byte.
+About a hundred test cases (all passing; see
+[docs/test_results.md](docs/test_results.md), case by case): worked examples
+whose answers were computed by hand, the rules every generated log promises
+(durations within the MITOS bounds, counter steps in office hours, the retry
+limit, reuse only while a result is valid), each command line end to end, the
+catalogue download and comparison against a made-up MITOS (no test uses the
+network), every view of the app driven without a browser, and the default
+dataset in `out/` regenerated byte for byte.
 
-The same tests run on GitHub for every pull request, on Linux and on Windows. The catalogue
-download and comparison are tested against a made-up MITOS, with no network.
-Others check what a release and a hosted deployment rely on: the version and
-the changelog agree, the committed configuration fixes no port, and the
-release workflow moves the branch the hosted app watches.
+Three checks judge the tests themselves, described in
+[docs/testing.md](docs/testing.md):
+
+- **Security.** `python -m bandit -r . -c bandit.yaml` reports nothing. Its
+  first scan, and a review of what it cannot see, led to a downloader that
+  only talks to the MITOS API, checked procedure ids, a safe XES writer, and
+  limits a loaded project cannot exceed.
+- **Coverage.** About 92% of the statements (`python -m pytest tests --cov`).
+- **Mutation.** `python tests/mutation_check.py --without-golden` plants 22
+  realistic bugs one at a time; the tests catch every one.
+
+On GitHub the tests run for every pull request on Linux and Windows, with a
+coverage floor of 85%, and bandit must report nothing.
+`python docs/build_test_report.py` rewrites the test results page.
 
 ## Limitations
 

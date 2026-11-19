@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import bisect
+import contextlib
 import csv
 import datetime as dt
 import gzip
@@ -28,8 +29,8 @@ import math
 import os
 import random
 import re
+import sys
 import time
-from xml.sax.saxutils import quoteattr
 
 __version__ = "0.1.1"
 
@@ -54,7 +55,24 @@ def seconds(iso: str | None) -> float | None:
     return ((y * 365 + mo * 30 + w * 7 + d) * 24 + h) * 3600 + mi * 60 + s
 
 
+# Characters XML 1.0 does not allow, even escaped: most C0 controls, lone
+# surrogates and two non-characters. Text from MITOS is free text typed by
+# civil servants, so a stray control character must not make the XES invalid.
+_XML_INVALID = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
+_XML_ESCAPES = {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
+                "\n": "&#10;", "\r": "&#13;", "\t": "&#9;"}
+
+
+def xml_attr(value) -> str:
+    """``value`` as a double-quoted XML attribute: escaped, and with the
+    characters XML 1.0 forbids removed. For writing XES; nothing here parses
+    XML."""
+    text = _XML_INVALID.sub("", str(value))
+    return '"' + "".join(_XML_ESCAPES.get(ch, ch) for ch in text) + '"'
+
+
 def poisson(rng: random.Random, lam: float) -> int:
+    """A Poisson draw with mean ``lam`` (Knuth's method; 0 when ``lam`` <= 0)."""
     if lam <= 0:
         return 0
     limit, k, p = math.exp(-lam), 0, 1.0
@@ -66,6 +84,7 @@ def poisson(rng: random.Random, lam: float) -> int:
 
 
 def weighted(rng: random.Random, table: dict):
+    """A key of ``table`` drawn with probability proportional to its value."""
     keys = list(table)
     cum, total = [], 0.0
     for k in keys:
@@ -103,6 +122,9 @@ class Catalogue:
         return out
 
     def title(self, pid: str, lang: str = "en") -> str:
+        """The title of procedure ``pid``: Greek for ``lang`` "el", else the
+        English from MITOS or from the translations, else the Greek (and the
+        title is noted in ``untranslated``)."""
         p = self.procedures[pid]
         if lang == "el":
             return p["title"]
@@ -160,8 +182,14 @@ def office_hours(t: dt.datetime, rng: random.Random) -> dt.datetime:
 
 
 class Generator:
+    """Simulates citizens through their life events and background use.
+
+    ``run`` fills ``instances`` (every service instance with its events and
+    its ground truth) and ``episodes``; ``write`` writes the log, the truth
+    and the manifest. The same ``seed`` and configuration give the same log."""
     def __init__(self, cat: Catalogue, cfg: dict, seed: int, rate_scale: float = 1.0):
-        self.cat, self.cfg, self.rng = cat, cfg, random.Random(seed)
+        # A seeded simulation, not a secret: the same seed must give the same log.
+        self.cat, self.cfg, self.rng = cat, cfg, random.Random(seed)  # nosec B311
         self.rate_scale = rate_scale
         self.b = cfg["behaviour"]
         self.instances: list = []
@@ -170,6 +198,10 @@ class Generator:
 
     # -- one service instance ------------------------------------------------
     def instance(self, citizen: dict, pid: str, t: dt.datetime, **truth) -> dict:
+        """One service instance of procedure ``pid`` started at ``t``: a path
+        through its counter or digital step tree, with durations drawn
+        between the MITOS bounds. ``truth`` (episode, role, attempt, ...)
+        is stored with it. A completed instance is held by the citizen."""
         rng, proc = self.rng, self.cat.procedures[pid]
         digital = bool(proc["digital_steps"]) and (
             not proc["steps"] or rng.random() < citizen["digital"])
@@ -267,6 +299,9 @@ class Generator:
 
     # -- one life event --------------------------------------------------------
     def episode(self, citizen: dict, scen: dict, trigger: dt.datetime) -> None:
+        """One life event of ``citizen`` at ``trigger``: starts the procedures of
+        scenario ``scen`` with their chances, delays and prerequisites, each
+        with the evidence it requires, and records the episode."""
         rng = self.rng
         ep = {"id": len(self.episodes) + 1, "citizen": citizen, "scenario": scen["id"],
               "trigger": trigger}
@@ -338,7 +373,7 @@ class Generator:
         both = lang == "both"
         name = (lambda el: el or "") if lang == "el" else cat.en
         stamp = lambda t: t.isoformat(timespec="seconds") + "+00:00"  # noqa: E731
-        attr = lambda kind, key, value: f'<{kind} key={quoteattr(key)} value={quoteattr(str(value))}/>'  # noqa: E731,E501
+        attr = lambda kind, key, value: f'<{kind} key={xml_attr(key)} value={xml_attr(value)}/>'  # noqa: E731,E501
         opener = gzip.open if compress else open
         with opener(path, "wt", encoding="utf-8", newline="\n") as f:
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -538,10 +573,61 @@ def check(cat: Catalogue, cfg: dict) -> list:
             out.append(f"Background service {pid} {why}.")
     if cfg["background"]["rate_per_year"] > 0 and not cfg["background"]["services"]:
         out.append("Background use has a rate but no service to draw from.")
+    out += _out_of_range(cfg)
     if sum(cfg["population"]["age_groups"].values()) <= 0:
         out.append("Every age group has a share of zero, so there are no citizens.")
     if not cfg["population"]["regions"]:
         out.append("The population has no region.")
+    return out
+
+
+# The largest values a run accepts. Far beyond anything realistic, they only
+# stop a configuration, typed or loaded from a file, that would make a run
+# take forever or exhaust memory.
+LIMITS = {"years": 10, "life_event_rate": 2.0, "background_rate": 50.0,
+          "delay_days": 3650, "max_attempts": 10, "evidence_depth": 5,
+          "evidence_validity_days": 36500}
+
+
+def _out_of_range(cfg: dict) -> list:
+    """Values outside what a run can handle, as sentences."""
+    out = []
+
+    def number(x):
+        # NaN and infinity fail the range comparison below
+        return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+    def within(value, low, high, what):
+        if not number(value) or not low <= value <= high:
+            out.append(f"{what} is {value!r}; it must be between {low} and {high}.")
+
+    within(cfg["window"]["years"], 0.1, LIMITS["years"], "The window in years")
+    b = cfg["behaviour"]
+    for key in ("evidence_probability", "alternative_evidence_probability",
+                "reuse_evidence_probability", "abandon_probability",
+                "negative_branch_weight", "retry_probability"):
+        if key in b:
+            within(b[key], 0, 1, f"Behaviour '{key}'")
+    if "max_attempts" in b:
+        within(b["max_attempts"], 1, LIMITS["max_attempts"], "Behaviour 'max_attempts'")
+    if "evidence_depth" in b:
+        within(b["evidence_depth"], 0, LIMITS["evidence_depth"], "Behaviour 'evidence_depth'")
+    if "evidence_validity_days" in b:
+        within(b["evidence_validity_days"], 0, LIMITS["evidence_validity_days"],
+               "Behaviour 'evidence_validity_days'")
+    for d in b.get("retry_delay_days", []):
+        within(d, 0, LIMITS["delay_days"], "A retry delay in days")
+    within(cfg["background"]["rate_per_year"], 0, LIMITS["background_rate"],
+           "The background rate per year")
+    for scen in cfg["scenarios"]:
+        name = f"Scenario '{scen.get('label', scen.get('id'))}'"
+        for group, rate in scen["rate_per_year"].items():
+            within(rate, 0, LIMITS["life_event_rate"], f"{name}: the rate for {group}")
+        for item in scen["procedures"]:
+            if "p" in item:
+                within(item["p"], 0, 1, f"{name}: the chance of {item['id']}")
+            for d in item.get("delay_days", []):
+                within(d, 0, LIMITS["delay_days"], f"{name}: a delay of {item['id']}")
     return out
 
 
@@ -702,6 +788,8 @@ def estimate(cat: Catalogue, cfg: dict, n_citizens: int, rate_scale: float = 1.0
 
 
 def describe(cat: Catalogue, cfg: dict) -> None:
+    """Print each scenario's procedures with the evidence MITOS attaches, the
+    labels left in Greek, and the remarks of :func:`review`."""
     b = cfg["behaviour"]
     for scen in cfg["scenarios"]:
         print(f"\n{scen['id']}: {scen['label']}")
@@ -734,11 +822,16 @@ def describe(cat: Catalogue, cfg: dict) -> None:
 
 
 def main() -> None:
+    """The command line: ``python generate.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--version", action="version", version=__version__)
-    ap.add_argument("--citizens", type=int, default=2000)
-    ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--out", default=os.path.join(HERE, "out"))
+    ap.add_argument("--citizens", type=int, default=2000,
+                    help="size of the population (default 2000)")
+    ap.add_argument("--seed", type=int, default=1,
+                    help="random seed; the same seed gives the same log (default 1)")
+    ap.add_argument("--out", default=os.path.join(HERE, "out"),
+                    help="folder to write the log, the ground truth and the manifest "
+                         "(default out/)")
     ap.add_argument("--lang", choices=("en", "el", "both"), default="en",
                     help="labels in English (Greek where MITOS has no English), "
                          "Greek, or English plus Greek columns")
@@ -748,17 +841,21 @@ def main() -> None:
     ap.add_argument("--rate-scale", type=float, default=1.0,
                     help="multiply every life-event rate, to make episodes of one "
                          "citizen overlap more often (a stress test)")
-    ap.add_argument("--scenarios", default=os.path.join(HERE, "scenarios.json"))
-    ap.add_argument("--catalogue", default=os.path.join(HERE, "catalogue.json.gz"))
-    ap.add_argument("--translations", default=os.path.join(HERE, "translations_en.json"))
+    ap.add_argument("--scenarios", default=os.path.join(HERE, "scenarios.json"),
+                    help="life-event scenarios, population and behaviour "
+                         "(default scenarios.json)")
+    ap.add_argument("--catalogue", default=os.path.join(HERE, "catalogue.json.gz"),
+                    help="MITOS catalogue snapshot (default catalogue.json.gz)")
+    ap.add_argument("--translations", default=os.path.join(HERE, "translations_en.json"),
+                    help="English renderings of labels MITOS has only in Greek "
+                         "(default translations_en.json)")
     ap.add_argument("--describe", action="store_true",
                     help="print the scenarios with their evidence and exit")
     args = ap.parse_args()
-    try:  # Greek labels on a Windows console
-        import sys
+    # Greek labels on a Windows console; a stream that cannot be
+    # reconfigured (redirected, or not a text stream) is left as it is.
+    with contextlib.suppress(AttributeError, OSError, ValueError):
         sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:  # noqa: BLE001
-        pass
     cat = Catalogue(args.catalogue, args.translations)
     with open(args.scenarios, encoding="utf-8") as f:
         cfg = json.load(f)

@@ -17,8 +17,8 @@ in several journeys, as it can be in several true episodes.
 """
 from __future__ import annotations
 
+import argparse
 import os
-import sys
 
 import pandas as pd
 
@@ -57,6 +57,12 @@ def contained(inner: pd.DataFrame, inner_key: str, outer: pd.DataFrame,
 
 
 def score(truth: pd.DataFrame, found: pd.DataFrame, shared: set) -> dict:
+    """How well ``found`` journeys match the ``truth`` episodes.
+
+    Precision, recall and F1 over pairs of instances placed together; the
+    share of episodes kept whole in one journey; the share of journeys that
+    lie within one episode (clean); the share of ``shared`` instances placed
+    in two or more journeys; and how many instances are in two or more."""
     t_pairs, f_pairs = together(truth, "episode"), together(found, "journey_id")
     hit = len(t_pairs.merge(f_pairs))
     prec, rec = hit / max(len(f_pairs), 1), hit / max(len(t_pairs), 1)
@@ -72,6 +78,8 @@ def score(truth: pd.DataFrame, found: pd.DataFrame, shared: set) -> dict:
 
 
 def fixed_gap(inst: pd.DataFrame, days: float) -> pd.DataFrame:
+    """The baseline: a citizen's next instance starts a new journey when it
+    starts more than ``days`` after everything before it has ended."""
     t = inst.sort_values(["citizen_id", "start"])
     prev_end = t.groupby("citizen_id").end.cummax().groupby(t.citizen_id).shift()
     gap = (t.start - prev_end).dt.total_seconds() / 86400
@@ -92,6 +100,8 @@ def truth_groups(inst: pd.DataFrame):
 
 
 def load_truth(folder: str):
+    """The instances of the truth file in ``folder``, the true episode of
+    each, and the instances that belong to more than one."""
     inst = pd.read_csv(os.path.join(folder, "truth_instances.csv"), dtype=str).fillna("")
     inst["start"], inst["end"] = pd.to_datetime(inst.start), pd.to_datetime(inst.end)
     truth, shared = truth_groups(inst)
@@ -99,7 +109,11 @@ def load_truth(folder: str):
 
 
 def main() -> None:
-    folder = sys.argv[1]
+    """The command line: ``python prototype/score.py <folder>``."""
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("folder", help="folder holding truth_instances.csv and the "
+                                   "journeys*.csv files of the methods")
+    folder = ap.parse_args().folder
     inst, truth, shared = load_truth(folder)
     print(f"{len(inst)} instances, {truth.episode.nunique()} episodes, "
           f"{len(shared)} truly shared instances")

@@ -37,6 +37,13 @@ BIN = 30.0  # days, resolution of the background rate over the calendar
 
 def fit(inst: pd.DataFrame, min_pairs: int = 15, min_triggered: float = 5.0,
         iters: int = 150, also_parent: float = 0.25, verbose: bool = False):
+    """Journeys found by a multivariate Hawkes process.
+
+    Every instance is either spontaneous (a calendar background, scaled by
+    each citizen's activity) or triggered by an earlier instance of the same
+    citizen through a log-normal kernel per pair of services, fitted by EM.
+    Returns the triggering pairs, the overlapping journeys, a partition, and
+    the number of instances expected to be spontaneous."""
     inst = inst.reset_index(drop=True)
     t0 = inst.start.min()
     day = ((inst.start - t0).dt.total_seconds() / 86400).to_numpy()
@@ -164,9 +171,10 @@ def fit(inst: pd.DataFrame, min_pairs: int = 15, min_triggered: float = 5.0,
 
 
 def main() -> None:
+    """The command line: ``python prototype/hawkes.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("folder", help="folder holding events.csv")
-    ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--verbose", action="store_true", help="report every iteration")
     args = ap.parse_args()
     inst = instances(os.path.join(args.folder, "events.csv"))
     pairs, journeys, partition, spontaneous = fit(inst, verbose=args.verbose)
