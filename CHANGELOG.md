@@ -34,6 +34,7 @@ a monthly refresh has found any.
   coverage, mutation, CI), and `docs/test_results.md`, written by
   `docs/build_test_report.py`, lists every test case with its result.
 - The README summarises every command line.
+- `docs/README.md` says what each page and file in `docs/` is for.
 
 **Fixes**
 
