@@ -251,3 +251,24 @@ def procedure(**changes):
 def test_each_kind_of_change_in_a_procedure_is_named(change, expected):
     assert catalogue_changes.differences(procedure(), procedure()) == []
     assert catalogue_changes.differences(procedure(), procedure(**change)) == [expected]
+
+
+SCRIPTS = ["generate.py", "bundles.py", "build_catalogue.py", "catalogue_changes.py",
+           "prototype/discover.py", "prototype/hawkes.py", "prototype/latent.py",
+           "prototype/register.py", "prototype/score.py"]
+
+
+@pytest.mark.parametrize("script", SCRIPTS)
+def test_every_command_line_explains_every_option(script):
+    import subprocess
+    run = subprocess.run([sys.executable, os.path.join(ROOT, script), "--help"],
+                         capture_output=True, text=True, encoding="utf-8")
+    assert run.returncode == 0, run.stderr[-500:]
+    lines = run.stdout.splitlines()
+    # an option line with nothing after it, and no indented line below, has no help
+    for n, line in enumerate(lines):
+        if line.startswith("  -") and not line.startswith("  -h, --help"):
+            text = line.strip().split("  ", 1)
+            has_text = len(text) > 1 and text[1].strip()
+            continued = n + 1 < len(lines) and lines[n + 1].startswith(" " * 6)
+            assert has_text or continued or "--version" in line, (script, line)

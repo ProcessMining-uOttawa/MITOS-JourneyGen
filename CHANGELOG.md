@@ -30,6 +30,16 @@ a monthly refresh has found any.
 - API documentation from the docstrings, built with pdoc and published on
   GitHub Pages for every release; the public functions that had no docstring
   have one.
+- `docs/testing.md` describes the test strategy (kinds of tests, security,
+  coverage, mutation, CI), and `docs/test_results.md`, written by
+  `docs/build_test_report.py`, lists every test case with its result.
+- The README summarises every command line.
+
+**Fixes**
+
+- `catalogue_changes.py --help` crashed on a `%` in a help text, and
+  `prototype/score.py` had no `--help`. Every option of every command now has
+  a help text, and a test checks it.
 
 ## 0.1.1 - 2026-11-17
 

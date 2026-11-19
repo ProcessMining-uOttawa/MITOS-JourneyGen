@@ -758,7 +758,8 @@ def main() -> None:
     ap.add_argument("folder", help="folder holding truth_instances.csv")
     ap.add_argument("--journeys", help="a journeys CSV (case_id, journey_id[, kind]) from a "
                                        "method; without it, the true episodes are used")
-    ap.add_argument("--min-size", type=int, default=2)
+    ap.add_argument("--min-size", type=int, default=2,
+                    help="leave out journeys of fewer instances (default 2)")
     ap.add_argument("--no-register", action="store_true",
                     help="do not say whether MITOS confirms each dependency")
     args = ap.parse_args()

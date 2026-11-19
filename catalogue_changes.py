@@ -179,13 +179,17 @@ def record(r: dict, json_path: str, log_path: str) -> None:
 def main() -> None:
     """The command line: ``python catalogue_changes.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("old")
-    ap.add_argument("new")
-    ap.add_argument("--scenarios", default=os.path.join(HERE, "scenarios.json"))
-    ap.add_argument("--json", default=os.path.join(HERE, "catalogue_changes.json"))
-    ap.add_argument("--log", default=os.path.join(HERE, "CATALOGUE_CHANGES.md"))
+    ap.add_argument("old", help="the previous catalogue (.json.gz)")
+    ap.add_argument("new", help="the new catalogue (.json.gz)")
+    ap.add_argument("--scenarios", default=os.path.join(HERE, "scenarios.json"),
+                    help="scenarios to check against the changes (default scenarios.json)")
+    ap.add_argument("--json", default=os.path.join(HERE, "catalogue_changes.json"),
+                    help="where to write the latest comparison (default "
+                         "catalogue_changes.json)")
+    ap.add_argument("--log", default=os.path.join(HERE, "CATALOGUE_CHANGES.md"),
+                    help="change log to prepend to (default CATALOGUE_CHANGES.md)")
     ap.add_argument("--force", action="store_true",
-                    help="accept a refresh that withdraws more than 5% of the procedures")
+                    help="accept a refresh that withdraws more than 5%% of the procedures")
     args = ap.parse_args()
     old, new = load(args.old), load(args.new)
     with open(args.scenarios, encoding="utf-8") as f:

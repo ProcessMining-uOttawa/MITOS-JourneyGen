@@ -165,7 +165,8 @@ def main() -> None:
     """The command line: ``python prototype/register.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("folder", help="folder holding events.csv")
-    ap.add_argument("--catalogue", default=os.path.join(HERE, "..", "catalogue.json.gz"))
+    ap.add_argument("--catalogue", default=os.path.join(HERE, "..", "catalogue.json.gz"),
+                    help="MITOS catalogue snapshot (default ../catalogue.json.gz)")
     ap.add_argument("--validity-days", type=float, default=90.0,
                     help="validity assumed where the register gives none")
     args = ap.parse_args()

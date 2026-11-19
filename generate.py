@@ -825,9 +825,13 @@ def main() -> None:
     """The command line: ``python generate.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--version", action="version", version=__version__)
-    ap.add_argument("--citizens", type=int, default=2000)
-    ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--out", default=os.path.join(HERE, "out"))
+    ap.add_argument("--citizens", type=int, default=2000,
+                    help="size of the population (default 2000)")
+    ap.add_argument("--seed", type=int, default=1,
+                    help="random seed; the same seed gives the same log (default 1)")
+    ap.add_argument("--out", default=os.path.join(HERE, "out"),
+                    help="folder to write the log, the ground truth and the manifest "
+                         "(default out/)")
     ap.add_argument("--lang", choices=("en", "el", "both"), default="en",
                     help="labels in English (Greek where MITOS has no English), "
                          "Greek, or English plus Greek columns")
@@ -837,9 +841,14 @@ def main() -> None:
     ap.add_argument("--rate-scale", type=float, default=1.0,
                     help="multiply every life-event rate, to make episodes of one "
                          "citizen overlap more often (a stress test)")
-    ap.add_argument("--scenarios", default=os.path.join(HERE, "scenarios.json"))
-    ap.add_argument("--catalogue", default=os.path.join(HERE, "catalogue.json.gz"))
-    ap.add_argument("--translations", default=os.path.join(HERE, "translations_en.json"))
+    ap.add_argument("--scenarios", default=os.path.join(HERE, "scenarios.json"),
+                    help="life-event scenarios, population and behaviour "
+                         "(default scenarios.json)")
+    ap.add_argument("--catalogue", default=os.path.join(HERE, "catalogue.json.gz"),
+                    help="MITOS catalogue snapshot (default catalogue.json.gz)")
+    ap.add_argument("--translations", default=os.path.join(HERE, "translations_en.json"),
+                    help="English renderings of labels MITOS has only in Greek "
+                         "(default translations_en.json)")
     ap.add_argument("--describe", action="store_true",
                     help="print the scenarios with their evidence and exit")
     args = ap.parse_args()

@@ -241,7 +241,9 @@ def main() -> None:
     """The command line: ``python prototype/discover.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("folder", help="folder holding events.csv")
-    ap.add_argument("--link-at", type=float, default=0.5)
+    ap.add_argument("--link-at", type=float, default=0.5,
+                    help="link two instances when the chance that they are related is at "
+                         "least this (default 0.5)")
     args = ap.parse_args()
     inst = instances(os.path.join(args.folder, "events.csv"))
     pairs, links, journeys, partition, window = discover(inst, link_at=args.link_at)

@@ -174,7 +174,7 @@ def main() -> None:
     """The command line: ``python prototype/hawkes.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("folder", help="folder holding events.csv")
-    ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--verbose", action="store_true", help="report every iteration")
     args = ap.parse_args()
     inst = instances(os.path.join(args.folder, "events.csv"))
     pairs, journeys, partition, spontaneous = fit(inst, verbose=args.verbose)

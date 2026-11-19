@@ -17,8 +17,8 @@ in several journeys, as it can be in several true episodes.
 """
 from __future__ import annotations
 
+import argparse
 import os
-import sys
 
 import pandas as pd
 
@@ -110,7 +110,10 @@ def load_truth(folder: str):
 
 def main() -> None:
     """The command line: ``python prototype/score.py <folder>``."""
-    folder = sys.argv[1]
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("folder", help="folder holding truth_instances.csv and the "
+                                   "journeys*.csv files of the methods")
+    folder = ap.parse_args().folder
     inst, truth, shared = load_truth(folder)
     print(f"{len(inst)} instances, {truth.episode.nunique()} episodes, "
           f"{len(shared)} truly shared instances")

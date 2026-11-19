@@ -70,3 +70,13 @@ def test_check_stops_what_cannot_run():
     cfg["population"]["age_groups"] = {a: 0 for a in cfg["population"]["age_groups"]}
     problems = " ".join(g.check(CAT, cfg))
     assert "no service to draw from" in problems and "no citizens" in problems
+
+
+def test_a_procedure_waiting_for_one_the_scenario_does_not_list_stops_a_run():
+    cfg = copy.deepcopy(BUNDLED)
+    first = cfg["scenarios"][0]["procedures"][0]
+    first["after"] = ["123456789"]
+    problems = g.check(CAT, cfg)
+    assert len(problems) == 1
+    assert f"procedure {first['id']} waits for 123456789" in problems[0]
+    assert "does not list" in problems[0]

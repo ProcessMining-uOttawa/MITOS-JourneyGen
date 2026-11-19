@@ -218,7 +218,8 @@ def main() -> None:
     ap.add_argument("--cache", required=True, help="directory for the raw API answers")
     ap.add_argument("--offline", action="store_true", help="do not download, only rebuild")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                                  "catalogue.json.gz"))
+                                                  "catalogue.json.gz"),
+                    help="catalogue to write (default catalogue.json.gz)")
     args = ap.parse_args()
     if not args.offline:
         began, shown = time.perf_counter(), [-10.0]

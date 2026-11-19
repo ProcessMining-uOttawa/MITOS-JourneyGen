@@ -8,6 +8,7 @@ passes: a gap in what the tests check, whatever the coverage says.
     python tests/mutation_check.py            # every mutant
     python tests/mutation_check.py 3 7        # only these
     python tests/mutation_check.py --without-golden   # without the byte-for-byte test
+    python tests/mutation_check.py --json docs/mutation_results.json   # keep the results
 
 ``--without-golden`` leaves out the test that regenerates ``out/`` byte for
 byte. That test notices any change, so a bug it alone catches is caught for
@@ -17,6 +18,7 @@ Not collected by pytest (no ``test_`` prefix). mutmut does not run on
 Windows, hence this hand-written list.
 """
 import io
+import json
 import os
 import subprocess
 import sys
@@ -74,7 +76,7 @@ MUTANTS = [
 TESTS = ["tests", "-x", "-q", "-p", "no:cacheprovider", "--ignore=tests/test_app.py"]
 
 
-def main(picked, tests=TESTS):
+def main(picked, tests=TESTS, json_path=None):
     results = []
     for n, (path, old, new, what) in enumerate(MUTANTS, 1):
         if picked and n not in picked:
@@ -93,13 +95,20 @@ def main(picked, tests=TESTS):
         finally:
             io.open(full, "w", encoding="utf-8", newline="").write(source)
         failed = [line.split(" - ")[0] for line in run.stdout.splitlines()
-                  if line.startswith("FAILED")]
+                  if line.startswith(("FAILED", "ERROR"))]
         verdict = "killed" if run.returncode else "SURVIVED"
         results.append((n, verdict, what, failed[0] if failed else ""))
         print(f"{n:2} {verdict:8} {time.perf_counter() - began:5.0f}s  {what}"
               + (f"  <- {failed[0]}" if failed else ""), flush=True)
     killed = sum(1 for r in results if r[1] == "killed")
     print(f"\n{killed} of {len(results)} mutants killed")
+    if json_path:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump({"without_golden": "--ignore=tests/test_default_dataset.py" in tests,
+                       "date": time.strftime("%Y-%m-%d"),
+                       "mutants": [{"n": n, "file": MUTANTS[n - 1][0], "bug": what,
+                                    "verdict": verdict, "caught_by": by}
+                                   for n, verdict, what, by in results]}, f, indent=1)
     return 0 if killed == len(results) else 1
 
 
@@ -107,4 +116,5 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     tests = TESTS + (["--ignore=tests/test_default_dataset.py"]
                      if "--without-golden" in args else [])
-    sys.exit(main({int(a) for a in args if a.isdigit()}, tests))
+    out = args[args.index("--json") + 1] if "--json" in args else None
+    sys.exit(main({int(a) for a in args if a.isdigit()}, tests, out))

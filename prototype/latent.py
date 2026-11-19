@@ -211,9 +211,11 @@ def main() -> None:
     """The command line: ``python prototype/latent.py --help``."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("folder", help="folder holding events.csv")
-    ap.add_argument("--kinds", type=int, default=12)
-    ap.add_argument("--restarts", type=int, default=3)
-    ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--kinds", type=int, default=12,
+                    help="number of hidden kinds of life event to learn (default 12)")
+    ap.add_argument("--restarts", type=int, default=3,
+                    help="random starts; the most likely fit is kept (default 3)")
+    ap.add_argument("--verbose", action="store_true", help="report every iteration")
     args = ap.parse_args()
     inst = instances(os.path.join(args.folder, "events.csv"))
     best = None
